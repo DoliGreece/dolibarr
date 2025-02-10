@@ -52,7 +52,7 @@ function dol_convertToWord($num, $langs, $currency = '', $centimes = false)
 	} else {
 		$TNum = explode('.', (string) $num);
 
-		$num = (int) $TNum[0];
+		$num = abs((int) $TNum[0]);
 		$words = array();
 		$list1 = array(
 			'',
@@ -153,11 +153,12 @@ function dol_convertToWord($num, $langs, $currency = '', $centimes = false)
 /**
  * Function to return number or amount in text.
  *
- * @deprecated
  * @param	float 	    $numero			Number to convert
  * @param	Translate	$langs			Language
  * @param	string	    $numorcurrency	'number' or 'amount'
  * @return 	string|int  	       			Text of the number or -1 in case TOO LONG (more than 1000000000000.99)
+ *
+ * @deprecated Use dol_convertToWord instead
  */
 function dolNumberToWord($numero, $langs, $numorcurrency = 'number')
 {
@@ -172,6 +173,7 @@ function dolNumberToWord($numero, $langs, $numorcurrency = 'number')
 	// Get 2 decimals to cents, another functions round or truncate
 	$strnumber = number_format($numero, 10);
 	$len = strlen($strnumber);
+	$parte_decimal = '00';  // For static analysis, strnumber should contain '.'
 	for ($i = 0; $i < $len; $i++) {
 		if ($strnumber[$i] == '.') {
 			$parte_decimal = $strnumber[$i + 1].$strnumber[$i + 2];
@@ -179,8 +181,7 @@ function dolNumberToWord($numero, $langs, $numorcurrency = 'number')
 		}
 	}
 
-	/*In dolibarr 3.6.2 (my current version) doesn't have $langs->default and
-	in case exist why ask $lang like a parameter?*/
+	/* Dolibarr 3.6.2 doesn't have $langs->default, why ask $lang like a parameter in case it exists? */
 	if (((is_object($langs) && $langs->getDefaultLang(0) == 'es_MX') || (!is_object($langs) && $langs == 'es_MX')) && $numorcurrency == 'currency') {
 		if ($numero >= 1 && $numero < 2) {
 			return ("UN PESO ".$parte_decimal." / 100 M.N.");
@@ -202,6 +203,10 @@ function dolNumberToWord($numero, $langs, $numorcurrency = 'number')
 				$numero -= $UdMMillon * 1000000000;
 				$entexto .= hundreds2text($CdMMillon, $DdMMillon, $UdMMillon);
 				$entexto .= " MIL ";
+			} else {
+				$CdMMillon = 0;
+				$DdMMillon = 0;
+				$UdMMillon = 0;
 			}
 			if ($number >= 1000000) {
 				$CdMILLON = (int) ($numero / 100000000);
@@ -217,6 +222,7 @@ function dolNumberToWord($numero, $langs, $numorcurrency = 'number')
 					$entexto .= " MILLONES ";
 				}
 			}
+
 			if ($number >= 1000) {
 				$cdm = (int) ($numero / 100000);
 				$numero -= $cdm * 100000;
@@ -228,6 +234,10 @@ function dolNumberToWord($numero, $langs, $numorcurrency = 'number')
 				if ($cdm || $ddm || $udm) {
 					$entexto .= " MIL ";
 				}
+			} else {
+				$ddm = 0;
+				$cdm = 0;
+				$udm = 0;
 			}
 			$c = (int) ($numero / 100);
 			$numero -= $c * 100;

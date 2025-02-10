@@ -4,7 +4,7 @@
  * Copyright (C) 2014		Marcos García		<marcosgdf@gmail.com>
  * Copyright (C) 2016		Charlie Benke		<charlie@patas-monkey.com>
  * Copyright (C) 2018-2021  Philippe Grand      <philippe.grand@atoo-net.com>
- * Copyright (C) 2018-2024  Frédéric France     <frederic.france@free.fr>
+ * Copyright (C) 2018-2025  Frédéric France     <frederic.france@free.fr>
  * Copyright (C) 2024		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -28,7 +28,7 @@
  *	\brief      File of class to build ODT documents for assets
  */
 
-require_once DOL_DOCUMENT_ROOT . '/asset/core/modules/asset/modules_asset.php';
+require_once DOL_DOCUMENT_ROOT . '/core/modules/asset/modules_asset.php';
 require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/functions2.lib.php';
@@ -398,6 +398,7 @@ class doc_generic_asset_odt extends ModelePDFAsset
 					}
 				}
 				// Replace tags of lines
+				/*
 				$foundtagforlines = 1;
 				try {
 					$listlines = $odfHandler->setSegment('lines');
@@ -431,7 +432,7 @@ class doc_generic_asset_odt extends ModelePDFAsset
 						dol_syslog($this->error, LOG_WARNING);
 						return -1;
 					}
-				}
+				}*/
 
 				// Replace labels translated
 				$tmparray = $outputlangs->get_translations_for_substitutions();

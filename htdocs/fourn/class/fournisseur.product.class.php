@@ -537,14 +537,14 @@ class ProductFournisseur extends Product
 			$sql .= " multicurrency_tx = ".(isset($multicurrency_tx) ? "'".$this->db->escape($multicurrency_tx)."'" : '1').",";
 			$sql .= " fk_multicurrency = ".(isset($fk_multicurrency) ? (int) $fk_multicurrency : 'null').",";
 			$sql .= " multicurrency_code = ".(isset($multicurrency_code) ? "'".$this->db->escape($multicurrency_code)."'" : 'null').",";
-			$sql .= " entity = ".$conf->entity.",";
-			$sql .= " tva_tx = ".price2num($tva_tx).",";
+			$sql .= " entity = ".((int) $conf->entity).",";
+			$sql .= " tva_tx = ".((float) price2num($tva_tx)).",";
 			// TODO Add localtax1 and localtax2
 			//$sql.= " localtax1_tx=".($localtax1>=0?$localtax1:'NULL').",";
 			//$sql.= " localtax2_tx=".($localtax2>=0?$localtax2:'NULL').",";
 			//$sql.= " localtax1_type=".($localtaxtype1!=''?"'".$this->db->escape($localtaxtype1)."'":"'0'").",";
 			//$sql.= " localtax2_type=".($localtaxtype2!=''?"'".$this->db->escape($localtaxtype2)."'":"'0'").",";
-			$sql .= " default_vat_code=".($newdefaultvatcode ? "'".$this->db->escape($newdefaultvatcode)."'" : "null").",";
+			$sql .= " default_vat_code = ".($newdefaultvatcode ? "'".$this->db->escape($newdefaultvatcode)."'" : "null").",";
 			$sql .= " info_bits = ".((int) $newnpr).",";
 			$sql .= " charges = ".((float) $charges).","; // deprecated
 			$sql .= " delivery_time_days = ".($delivery_time_days != '' ? ((int) $delivery_time_days) : 'null').",";
@@ -1025,7 +1025,7 @@ class ProductFournisseur extends Product
 						}
 					}
 
-					if ($fourn_unitprice < $min || $min == -1) {
+					if ($fourn_unitprice_with_discount < $min || $min == -1) {
 						$this->id                       = $prodid;
 						$this->product_fourn_price_id   = $record["product_fourn_price_id"];
 						$this->ref_supplier             = $record["ref_fourn"];
@@ -1050,7 +1050,7 @@ class ProductFournisseur extends Product
 						$this->fourn_multicurrency_id          = $record["fk_multicurrency"];
 						$this->fourn_multicurrency_code        = $record["multicurrency_code"];
 
-						$min = $fourn_unitprice;
+						$min = $fourn_unitprice_with_discount;
 					}
 				}
 			}
@@ -1128,13 +1128,13 @@ class ProductFournisseur extends Product
 	public function display_price_product_fournisseur($showunitprice = 1, $showsuptitle = 1, $maxlen = 0, $notooltip = 0, $productFournList = array())
 	{
 		// phpcs:enable
-		global $conf, $langs;
+		global $conf, $langs, $user;
 
 		$out = '';
 		$langs->load("suppliers");
 		if (count($productFournList) > 0) {
-			$out .= '<table class="nobordernopadding" width="100%">';
-			$out .= '<tr><td class="liste_titre right">'.($showunitprice ? $langs->trans("Price").' '.$langs->trans("HT") : '').'</td>';
+			$out .= '<table class="centpercent liste nomarginbottom">';
+			$out .= '<tr class="liste_titre"><td class="liste_titre right">'.($showunitprice ? $langs->trans("Price").' '.$langs->trans("HT") : '').'</td>';
 			$out .= '<td class="liste_titre right">'.($showunitprice ? $langs->trans("QtyMin") : '').'</td>';
 			$out .= '<td class="liste_titre">'.$langs->trans("Supplier").'</td>';
 			$out .= '<td class="liste_titre">'.$langs->trans("SupplierRef").'</td></tr>';
@@ -1142,13 +1142,16 @@ class ProductFournisseur extends Product
 				$out .= '<tr><td class="right">'.($showunitprice ? price($productFourn->fourn_unitprice * (1 - $productFourn->fourn_remise_percent / 100) - $productFourn->fourn_remise) : '').'</td>';
 				$out .= '<td class="right">'.($showunitprice ? $productFourn->fourn_qty : '').'</td>';
 				$out .= '<td>'.$productFourn->getSocNomUrl(1, 'supplier', $maxlen, $notooltip).'</td>';
-				$out .= '<td>'.$productFourn->fourn_ref.'<td></tr>';
+				$out .= '<td>'.dolPrintHTML($productFourn->fourn_ref).'</td></tr>';
 			}
 			$out .= '</table>';
 		} else {
-			$out = ($showunitprice ? price($this->fourn_unitprice * (1 - $this->fourn_remise_percent / 100) + $this->fourn_remise, 0, $langs, 1, -1, -1, $conf->currency).' '.$langs->trans("HT").' &nbsp; <span class="opacitymedium">(</span>' : '');
-			$out .= ($showsuptitle ? '<span class="opacitymedium">'.$langs->trans("Supplier").'</span>: ' : '').$this->getSocNomUrl(1, 'supplier', $maxlen, $notooltip).' / <span class="opacitymedium">'.$langs->trans("SupplierRef").'</span>: '.$this->ref_supplier;
-			$out .= ($showunitprice ? '<span class="opacitymedium">)</span>' : '');
+			$out = ($showunitprice ? price($this->fourn_unitprice * (1 - $this->fourn_remise_percent / 100) + $this->fourn_remise, 0, $langs, 1, -1, -1, $conf->currency).' '.$langs->trans("HT") : '');
+			if ($user->hasRight("fournisseur", "read")) {	// Without permission, never show the best supplier seller
+				$out .= ($showunitprice ? ' &nbsp; <span class="opacitymedium">(</span>' : '');
+				$out .= ($showsuptitle ? '<span class="opacitymedium">'.$langs->trans("Supplier").'</span>: ' : '').$this->getSocNomUrl(1, 'supplier', $maxlen, $notooltip).' / <span class="opacitymedium">'.$langs->trans("SupplierRef").'</span>: '.$this->ref_supplier;
+				$out .= ($showunitprice ? '<span class="opacitymedium">)</span>' : '');
+			}
 		}
 		return $out;
 	}
@@ -1417,9 +1420,9 @@ class ProductFournisseur extends Product
 		if (empty($notooltip)) {
 			if (getDolGlobalString('MAIN_OPTIMIZEFORTEXTBROWSER')) {
 				$label = $langs->trans("SupplierRef");
-				$linkclose .= ' alt="'.dol_escape_htmltag($label, 1).'"';
+				$linkclose .= ' alt="'.dolPrintHTMLForAttribute($label).'"';
 			}
-			$linkclose .= ' title="'.dol_escape_htmltag($label, 1).'"';
+			$linkclose .= ' title="'.dolPrintHTMLForAttribute($label).'"';
 			$linkclose .= ' class="classfortooltip'.($morecss ? ' '.$morecss : '').'"';
 		} else {
 			$linkclose = ($morecss ? ' class="'.$morecss.'"' : '');
@@ -1524,7 +1527,7 @@ class ProductFournisseur extends Product
 		$sql .= (isset($multicurrency_code) ? "'".$this->db->escape($multicurrency_code)."'" : 'null').",";
 		$sql .= "'".$this->db->idate($datec)."',";
 		$sql .= " ".((int) $this->product_fourn_price_id).",";
-		$sql .= " ".$user->id.",";
+		$sql .= " ".((int) $user->id).",";
 		$sql .= " ".price2num($buyprice).",";
 		$sql .= " ".price2num($qty);
 		$sql .= ")";

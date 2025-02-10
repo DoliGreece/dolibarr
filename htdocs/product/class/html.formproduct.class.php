@@ -1,8 +1,8 @@
 <?php
-/* Copyright (C) 2008-2009 Laurent Destailleur  <eldy@users.sourceforge.net>
- * Copyright (C) 2015-2017 Francis Appels       <francis.appels@yahoo.com>
- * Copyright (C) 2024		Frédéric France			<frederic.france@free.fr>
- * Copyright (C) 2024		MDW							<mdeweerd@users.noreply.github.com>
+/* Copyright (C) 2008-2009  Laurent Destailleur     <eldy@users.sourceforge.net>
+ * Copyright (C) 2015-2017  Francis Appels          <francis.appels@yahoo.com>
+ * Copyright (C) 2024       Frédéric France         <frederic.france@free.fr>
+ * Copyright (C) 2024		MDW						<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -335,6 +335,7 @@ class FormProduct
 			}
 		}
 
+		$out .= '<!-- selectWarehouses -->';
 		$out .= '<select '.($multiselect ? 'multiple ' : '').'class="flat'.($morecss ? ' '.$morecss : '').'"'.($disabled ? ' disabled' : '');
 		$out .= ' id="'.$htmlname.'" name="'.($htmlname.($multiselect ? '[]' : '').($disabled ? '_disabled' : '')).'"';
 		//$out .= ' placeholder="todo"'; 	// placeholder for select2 must be added by setting the id+placeholder js param when calling select2
@@ -576,6 +577,7 @@ class FormProduct
 		$langs->load("other");
 
 		$return = '';
+		$placeholderID = ($mode == 2 ? '99999999' : '-1'); // we don't want ajaxcombobox replace clearing option in mode 2
 
 		// TODO Use a cache
 		require_once DOL_DOCUMENT_ROOT.'/core/class/cunits.class.php';
@@ -589,7 +591,7 @@ class FormProduct
 
 		$result = $measuringUnits->fetchAll(
 			'',
-			'',
+			'scale',
 			0,
 			0,
 			$filter
@@ -631,7 +633,7 @@ class FormProduct
 			$return .= '</select>';
 		}
 
-		$return .= ajax_combobox($name);
+		$return .= ajax_combobox($name, array(), 0, 0, 'resolve', $placeholderID);	// avoid to have hidden value if scale = -1 (eg DM size)
 
 		return $return;
 	}

@@ -35,6 +35,14 @@ if (isModEnabled('category')) {
 	require_once DOL_DOCUMENT_ROOT.'/categories/class/categorie.class.php';
 }
 
+/**
+ * @var Conf $conf
+ * @var DoliDB $db
+ * @var HookManager $hookmanager
+ * @var Translate $langs
+ * @var User $user
+ */
+
 // Load translation files required by the page
 $langs->loadLangs(array("stocks", "other"));
 
@@ -49,7 +57,7 @@ $backtopage = GETPOST('backtopage', 'alpha'); // Go back to a dedicated page
 $optioncss  = GETPOST('optioncss', 'aZ'); // Option for the css output (always '' except when 'print')
 $mode       = GETPOST('mode', 'aZ'); // The output mode ('list', 'kanban', 'hierarchy', 'calendar', ...)
 
-$search_all = trim((GETPOST('search_all', 'alphanohtml') != '') ? GETPOST('search_all', 'alphanohtml') : GETPOST('sall', 'alphanohtml'));
+$search_all = trim(GETPOST('search_all', 'alphanohtml'));
 $search_ref = GETPOST("sref", "alpha") ? GETPOST("sref", "alpha") : GETPOST("search_ref", "alpha");
 $search_label = GETPOST("snom", "alpha") ? GETPOST("snom", "alpha") : GETPOST("search_label", "alpha");
 $search_status = GETPOST("search_status", "intcomma");
@@ -200,6 +208,7 @@ $form = new Form($db);
 $warehouse = new Entrepot($db);
 
 $now = dol_now();
+$totalarray = array();
 
 $title = $langs->trans("Warehouses");
 $help_url = 'EN:Module_Stocks_En|FR:Module_Stock|ES:M&oacute;dulo_Stocks';
@@ -247,7 +256,7 @@ if ($separatedPMP) {
 }
 $sql .= " WHERE t.entity IN (".getEntity('stock').")";
 foreach ($search as $key => $val) {
-	if (array_key_exists($key, $object->fields)) {
+	if (array_key_exists($key, $object->fields)||$key == 'status') {
 		$class_key = $key;
 		if ($class_key == 'status') {
 			$class_key = 'statut'; // remove this after refactoring entrepot.class property statut to status
@@ -616,7 +625,6 @@ if (!getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
 }
 print '</tr>'."\n";
 
-$totalarray = array();
 $totalarray['nbfield'] = 0;
 
 // Fields title label
@@ -671,7 +679,7 @@ include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_list_search_title.tpl.php';
 
 // Hook fields
 $parameters = array('arrayfields' => $arrayfields, 'param' => $param, 'sortfield' => $sortfield, 'sortorder' => $sortorder);
-$reshook = $hookmanager->executeHooks('printFieldListTitle', $parameters, $object); // Note that $action and $object may have been modified by hook
+$reshook = $hookmanager->executeHooks('printFieldListTitle', $parameters, $object, $action); // Note that $action and $object may have been modified by hook
 print $hookmanager->resPrint;
 
 if (!empty($arrayfields['t.statut']['checked'])) {
@@ -890,11 +898,6 @@ while ($i < $imaxinloop) {
 	$i++;
 }
 
-if ($totalnboflines - $offset <= $limit) {
-	// Show total line
-	include DOL_DOCUMENT_ROOT.'/core/tpl/list_print_total.tpl.php';
-}
-
 // If no record found
 if ($num == 0) {
 	$colspan = 1;
@@ -907,6 +910,9 @@ if ($num == 0) {
 }
 
 $db->free($resql);
+
+// Unconditionally show the total line (modification: totals are now displayed on every page)
+include DOL_DOCUMENT_ROOT.'/core/tpl/list_print_total.tpl.php';
 
 $parameters = array('arrayfields' => $arrayfields, 'sql' => $sql);
 $reshook = $hookmanager->executeHooks('printFieldListFooter', $parameters, $object); // Note that $action and $object may have been modified by hook

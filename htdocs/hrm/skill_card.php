@@ -5,7 +5,7 @@
  * Copyright (C) 2021 Jean-Pascal BOUDET <jean-pascal.boudet@atm-consulting.fr>
  * Copyright (C) 2021 Grégory BLEMAND <gregory.blemand@atm-consulting.fr>
  * Copyright (C) 2023-2024  Frédéric France     <frederic.france@free.fr>
- * Copyright (C) 2024		MDW						<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2024-2025	MDW					<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -36,6 +36,14 @@ require_once DOL_DOCUMENT_ROOT . '/core/class/html.formprojet.class.php';
 require_once DOL_DOCUMENT_ROOT . '/hrm/class/skill.class.php';
 require_once DOL_DOCUMENT_ROOT . '/hrm/lib/hrm_skill.lib.php';
 
+
+/**
+ * @var Conf $conf
+ * @var DoliDB $db
+ * @var HookManager $hookmanager
+ * @var Translate $langs
+ * @var User $user
+ */
 
 // Load translation files required by the page
 $langs->loadLangs(array('hrm', 'other', 'products'));  // why products?
@@ -164,15 +172,17 @@ if (empty($reshook)) {
 				'@phan-var-force Skilldet[] $arraySkill';
 				$index = 0;
 				foreach ($arraySkill as $skilldet) {
-					if (isset($skilldetArray[$index])) {
-						$SkValueToUpdate = $skilldetArray[$index];
-						$skilldet->description = $SkValueToUpdate;
-						$resupd = $skilldet->update($user);
-						if ($resupd <= 0) {
-							setEventMessage($langs->trans('errorUpdateSkilldet'), 'errors');
+					if ($skilldet->rankorder != 0) {
+						if (isset($skilldetArray[$index])) {
+							$SkValueToUpdate = $skilldetArray[$index];
+							$skilldet->description = !empty($SkValueToUpdate) ? $SkValueToUpdate : $skilldet->description;
+							$resupd = $skilldet->update($user);
+							if ($resupd <= 0) {
+								setEventMessage($langs->trans('errorUpdateSkilldet'), 'errors');
+							}
 						}
+						$index++;
 					}
-					$index++;
 				}
 				header("Location: ".$_SERVER["PHP_SELF"]."?id=".$object->id);
 				exit;
@@ -581,7 +591,7 @@ if ($action != "create" && $action != "edit") {
 	}
 
 	// Initialize array of search criteria
-	$search_all = GETPOST('search_all', 'alphanohtml') ? GETPOST('search_all', 'alphanohtml') : GETPOST('sall', 'alphanohtml');
+	$search_all = GETPOST('search_all', 'alphanohtml');
 	$search = array();
 	foreach ($objectline->fields as $key => $val) {
 		if (GETPOST('search_' . $key, 'alpha') !== '') {
@@ -644,6 +654,7 @@ if ($action != "create" && $action != "edit") {
 		$sql .= " WHERE 1 = 1 ";
 	}
 	$sql .= " AND fk_skill = ".((int) $id);
+	$sql .= " AND rankorder <> 0";
 
 	$resql = $db->query($sql);
 	$nbtotalofrecords = $db->num_rows($resql);
@@ -781,7 +792,7 @@ if ($action != "create" && $action != "edit") {
 				if ($key == 'status') {
 					print $objectline->getLibStatut(5);
 				} elseif ($key == 'rowid') {
-					print $objectline->showOutputField($val, $key, $objectline->id, '');
+					print $objectline->showOutputField($val, $key, (string) $objectline->id, '');
 					// ajout pencil
 					print '<a class="timeline-btn" href="' . DOL_MAIN_URL_ROOT . '/comm/action/skilldet_card.php?action=edit&id=' . $objectline->id . '"><i class="fa fa-pencil" title="' . $langs->trans("Modify") . '" ></i></a>';
 				} else {
@@ -890,7 +901,11 @@ if ($action != "create" && $action != "edit") {
 	print '<div class="fichecenter"><div class="fichehalfleft">';
 
 	// Show links to link elements
-	$linktoelem = $form->showLinkToObjectBlock($object, null, array('skill'));
+	$tmparray = $form->showLinkToObjectBlock($object, array(), array('skill'), 1);
+	$linktoelem = $tmparray['linktoelem'];
+	$htmltoenteralink = $tmparray['htmltoenteralink'];
+	print $htmltoenteralink;
+
 	$somethingshown = $form->showLinkedObjectBlock($object, $linktoelem);
 
 	print '</div><div class="fichehalfright">';

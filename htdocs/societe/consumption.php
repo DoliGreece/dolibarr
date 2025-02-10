@@ -4,8 +4,8 @@
  * Copyright (C) 2013-2015 Juanjo Menent		<jmenent@2byte.es>
  * Copyright (C) 2015      Marcos García        <marcosgdf@gmail.com>
  * Copyright (C) 2015-2017 Ferran Marcet		<fmarcet@2byte.es>
- * Copyright (C) 2021-2022 Frédéric France		<frederic.france@netlogic.fr>
- * Copyright (C) 2024		MDW							<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2021-2024  Frédéric France		<frederic.france@free.fr>
+ * Copyright (C) 2024-2025	MDW					<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -34,6 +34,14 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/html.formother.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.class.php';
 
+
+/**
+ * @var Conf $conf
+ * @var DoliDB $db
+ * @var HookManager $hookmanager
+ * @var Translate $langs
+ * @var User $user
+ */
 
 // Load translation files required by the page
 $langs->loadLangs(array("companies", "bills", "orders", "suppliers", "propal", "interventions", "contracts", "products"));
@@ -408,7 +416,7 @@ if (!empty($sql_select)) {
 	$sql .= $where;
 	$sql .= dolSqlDateFilter($dateprint, 0, $month, $year);
 	if ($sref) {
-		$sql .= " AND ".$doc_number." LIKE '%".$db->escape($sref)."%'";
+		$sql .= " AND ".$db->sanitize((string) $doc_number)." LIKE '%".$db->escape($sref)."%'";
 	}
 	if ($sprod_fulldescr) {
 		// We test both case description is correctly saved of was save after dol_escape_htmltag().

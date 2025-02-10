@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2009-2010 Laurent Destailleur  <eldy@users.sourceforge.net>
  * Copyright (C) 2024       Frédéric France             <frederic.france@free.fr>
+ * Copyright (C) 2025		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -38,8 +39,8 @@ if (!defined('NOTOKENRENEWAL')) {
  * @param	string			$target				Target to use on links
  * @param 	int    			$disablejs			More content into html header
  * @param 	int    			$disablehead		More content into html header
- * @param 	array|string  	$arrayofjs			Array of complementary js files
- * @param 	array|string  	$arrayofcss			Array of complementary css files
+ * @param 	string[]|string	$arrayofjs			Array of complementary js files
+ * @param 	string[]|string	$arrayofcss			Array of complementary css files
  * @param	string			$morequerystring	Query string to add to the link "print" to get same parameters (use only if autodetect fails)
  * @param   string  		$morecssonbody      More CSS on body tag. For example 'classforhorizontalscrolloftabs'.
  * @param	string			$replacemainareaby	Replace call to main_area() by a print of this string
@@ -47,7 +48,7 @@ if (!defined('NOTOKENRENEWAL')) {
  * @param	int				$disablenoindex		Disable the "noindex" on meta robot header
  * @return	void
  */
-function llxHeader($head = '', $title = '', $help_url = '', $target = '', $disablejs = 0, $disablehead = 0, $arrayofjs = '', $arrayofcss = '', $morequerystring = '', $morecssonbody = '', $replacemainareaby = '', $disablenofollow = 0, $disablenoindex = 0)
+function llxHeaderEmptyExample($head = '', $title = '', $help_url = '', $target = '', $disablejs = 0, $disablehead = 0, $arrayofjs = '', $arrayofcss = '', $morequerystring = '', $morecssonbody = '', $replacemainareaby = '', $disablenofollow = 0, $disablenoindex = 0)
 {
 	print '<html><title>Build an import example file</title><body>';
 }
@@ -60,7 +61,7 @@ function llxHeader($head = '', $title = '', $help_url = '', $target = '', $disab
  * @param	int		$disabledoutputofmessages	Clear all messages stored into session without displaying them
  * @return	void
  */
-function llxFooter($comment = '', $zone = 'private', $disabledoutputofmessages = 0)
+function llxFooterEmptyExample($comment = '', $zone = 'private', $disabledoutputofmessages = 0)
 {
 	print '</body></html>';
 }
@@ -70,6 +71,14 @@ require '../main.inc.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/imports/class/import.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/modules/import/modules_import.php';
+
+/**
+ * @var Conf $conf
+ * @var DoliDB $db
+ * @var HookManager $hookmanager
+ * @var Translate $langs
+ * @var User $user
+ */
 
 $datatoimport = GETPOST('datatoimport');
 $format = GETPOST('format');
@@ -81,9 +90,9 @@ $langs->load("exports");
 if (empty($datatoimport)) {
 	$user->loadRights();
 
-	llxHeader();
+	llxHeaderEmptyExample();
 	print '<div class="error">Bad value for datatoimport.</div>';
-	llxFooter();
+	llxFooterEmptyExample();
 	exit;
 }
 

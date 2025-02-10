@@ -20,7 +20,7 @@
  * Copyright (C) 2019-2020  Thibault FOUCART        <support@ptibogxiv.net>
  * Copyright (C) 2020       Pierre Ardoin           <mapiolca@me.com>
  * Copyright (C) 2022       Vincent de Grandpré     <vincent@de-grandpre.quebec>
- * Copyright (C) 2024       MDW                     <mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2024-2025	MDW                     <mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -57,6 +57,14 @@ require_once DOL_DOCUMENT_ROOT.'/categories/class/categorie.class.php';
 require_once DOL_DOCUMENT_ROOT.'/product/class/html.formproduct.class.php';
 require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 
+/**
+ * @var Conf $conf
+ * @var DoliDB $db
+ * @var HookManager $hookmanager
+ * @var Societe $mysoc
+ * @var Translate $langs
+ * @var User $user
+ */
 
 if (isModEnabled('propal')) {
 	require_once DOL_DOCUMENT_ROOT.'/comm/propal/class/propal.class.php';
@@ -112,7 +120,7 @@ $cancel = GETPOST('cancel', 'alpha');
 $backtopage = GETPOST('backtopage', 'alpha');
 $confirm = GETPOST('confirm', 'alpha');
 $socid = GETPOSTINT('socid');
-$duration_value = GETPOSTINT('duration_value');
+$duration_value = GETPOST('duration_value');	// duration value can be an empty string
 $duration_unit = GETPOST('duration_unit', 'alpha');
 
 $accountancy_code_sell = GETPOST('accountancy_code_sell', 'alpha');
@@ -353,7 +361,7 @@ if (empty($reshook)) {
 						'SupplierProposal' => '/supplier_proposal/class/supplier_proposal.class.php',
 					);
 
-					//First, all core objects must update their tables
+					// First, all core objects must update their tables
 					foreach ($objects as $object_name => $object_file) {
 						require_once DOL_DOCUMENT_ROOT.$object_file;
 
@@ -398,10 +406,27 @@ if (empty($reshook)) {
 				}
 
 				if (!$error) {
-					// We finally remove the old product
-					// TODO merge attached files from old product into new one before delete
+					// Delete the product
 					if ($productOrigin->delete($user) < 1) {
 						$error++;
+					}
+				}
+
+				if ($error) {
+					// Move files from the dir of the third party to delete into the dir of the third party to keep
+					if (!empty($conf->product->multidir_output[$productOrigin->entity])) {
+						$srcdir = $conf->product->multidir_output[$productOrigin->entity]."/".$productOrigin->ref;
+						$destdir = $conf->product->multidir_output[$object->entity]."/".$object->ref;
+
+						if (dol_is_dir($srcdir)) {
+							$dirlist = dol_dir_list($srcdir, 'files', 1);
+							foreach ($dirlist as $filetomove) {
+								$destfile = $destdir.'/'.$filetomove['relativename'];
+								//var_dump('Move file '.$filetomove['relativename'].' into '.$destfile);
+								dol_move($filetomove['fullname'], $destfile, '0', 0, 0, 1);
+							}
+							//exit;
+						}
 					}
 				}
 
@@ -516,7 +541,7 @@ if (empty($reshook)) {
 			$object->ref				= (string) $ref;
 			$object->label				= GETPOST('label', $label_security_check);
 			$object->price_base_type	= GETPOST('price_base_type', 'aZ09');
-			$object->mandatory_period	= !empty(GETPOST("mandatoryperiod", 'alpha')) ? 1 : 0;
+			$object->mandatory_period	= empty(GETPOST("mandatoryperiod", 'alpha')) ? 0 : 1;
 			if ($object->price_base_type == 'TTC') {
 				$object->price_ttc = GETPOSTFLOAT('price');
 			} else {
@@ -582,7 +607,7 @@ if (empty($reshook)) {
 			$stdobject = new GenericObject($db);
 			$stdobject->element = 'product';
 			$stdobject->barcode_type = GETPOSTINT('fk_barcode_type');
-			$result = $stdobject->fetch_barcode();
+			$result = $stdobject->fetchBarCode();
 			if ($result < 0) {
 				$error++;
 				$mesg = 'Failed to get bar code type information ';
@@ -782,7 +807,7 @@ if (empty($reshook)) {
 				$object->seuil_stock_alerte     = GETPOST('seuil_stock_alerte');
 				$object->desiredstock           = GETPOST('desiredstock');
 				*/
-				$object->duration_value         = GETPOSTINT('duration_value');
+				$object->duration_value         = GETPOST('duration_value');
 				$object->duration_unit          = GETPOST('duration_unit', 'alpha');
 
 				$object->canvas                 = GETPOST('canvas');
@@ -827,7 +852,7 @@ if (empty($reshook)) {
 				$stdobject = new GenericObject($db);
 				$stdobject->element = 'product';
 				$stdobject->barcode_type = GETPOSTINT('fk_barcode_type');
-				$result = $stdobject->fetch_barcode();
+				$result = $stdobject->fetchBarCode();
 				if ($result < 0) {
 					$error++;
 					$mesg = 'Failed to get bar code type information ';
@@ -1287,6 +1312,13 @@ if (empty($reshook)) {
 			setEventMessages($langs->trans("WarningSelectOneDocument"), null, 'warnings');
 		}
 	}
+
+	// Actions to send emails
+	$triggersendname = 'PRODUCT_SENTBYMAIL';
+	$paramname = 'id';
+	$autocopy = 'MAIN_MAIL_AUTOCOPY_PRODUCT_TO';
+	$trackid = 'prod'.$object->id;
+	include DOL_DOCUMENT_ROOT.'/core/actions_sendmails.inc.php';
 }
 
 
@@ -1481,7 +1513,7 @@ if (is_object($objcanvas) && $objcanvas->displayCanvasExists($canvasdisplayactio
 						$inherited_mask_lot = getDolGlobalString('LOT_ADVANCED_MASK');
 						$inherited_mask_sn = getDolGlobalString('SN_ADVANCED_MASK');
 						print '<td id="field_mask">';
-						print $form->textwithpicto('<input type="text" class="flat minwidth175" name="batch_mask" id="batch_mask_input">', $tooltip, 1, 1);
+						print $form->textwithpicto('<input type="text" class="flat minwidth175" name="batch_mask" id="batch_mask_input">', $tooltip, 1, 'help');
 						print '<script type="text/javascript">
 									$(document).ready(function() {
 										$("#field_mask, #mask_option").addClass("hideobject");
@@ -1611,18 +1643,20 @@ if (is_object($objcanvas) && $objcanvas->displayCanvasExists($canvasdisplayactio
 			if ($type == 1) {
 				print '<tr><td>'.$langs->trans("Duration").'</td><td>';
 				print img_picto('', 'clock', 'class="pictofixedwidth"');
-				print '<input name="duration_value" size="4" value="'.GETPOSTINT('duration_value').'">';
+				print '<input name="duration_value" class="width50" value="'.(GETPOSTISSET('duration_value') ? GETPOST('duration_value') : '').'">';
 				print $formproduct->selectMeasuringUnits("duration_unit", "time", (GETPOSTISSET('duration_unit') ? GETPOST('duration_unit', 'alpha') : 'h'), 0, 1);
 
 				// Mandatory period
-				print ' &nbsp; &nbsp; &nbsp; ';
-				print '<input type="checkbox" id="mandatoryperiod" name="mandatoryperiod"'.($object->mandatory_period == 1 ? ' checked="checked"' : '').'>';
+				if ($object->duration_value > 0) {
+					print ' &nbsp; &nbsp; ';
+				}
+				print '<input type="checkbox" class="marginleftonly valignmiddle" id="mandatoryperiod" name="mandatoryperiod"'.($object->mandatory_period == 1 ? ' checked="checked"' : '').'>';
 				print '<label for="mandatoryperiod">';
 				$htmltooltip = $langs->trans("mandatoryHelper");
 				if (!getDolGlobalString('SERVICE_STRICT_MANDATORY_PERIOD')) {
 					$htmltooltip .= '<br>'.$langs->trans("mandatoryHelper2");
 				}
-				print $form->textwithpicto($langs->trans("mandatoryperiod"), $htmltooltip, 1, 0);
+				print $form->textwithpicto($langs->trans("mandatoryperiod"), $htmltooltip, 1, 'info');
 				print '</label>';
 
 				print '</td></tr>';
@@ -1643,7 +1677,7 @@ if (is_object($objcanvas) && $objcanvas->displayCanvasExists($canvasdisplayactio
 					print '<tr><td>'.$langs->trans("Weight").'</td><td>';
 					print img_picto('', 'fa-balance-scale', 'class="pictofixedwidth"');
 					print '<input name="weight" size="4" value="'.GETPOST('weight').'">';
-					print $formproduct->selectMeasuringUnits("weight_units", "weight", GETPOSTISSET('weight_units') ? GETPOST('weight_units', 'alpha') : (!getDolGlobalString('MAIN_WEIGHT_DEFAULT_UNIT') ? 0 : getDolGlobalString('MAIN_WEIGHT_DEFAULT_UNIT')), 0, 2);
+					print $formproduct->selectMeasuringUnits("weight_units", "weight", GETPOSTISSET('weight_units') ? GETPOST('weight_units', 'alpha') : (GETPOST('weight_units', 'alpha') ?: getDolGlobalString('MAIN_WEIGHT_DEFAULT_UNIT', 0)), 0, 2);
 					print '</td></tr>';
 				}
 
@@ -1654,21 +1688,21 @@ if (is_object($objcanvas) && $objcanvas->displayCanvasExists($canvasdisplayactio
 					print '<input name="size" class="width50" value="'.GETPOST('size').'"> x ';
 					print '<input name="sizewidth" class="width50" value="'.GETPOST('sizewidth').'"> x ';
 					print '<input name="sizeheight" class="width50" value="'.GETPOST('sizeheight').'">';
-					print $formproduct->selectMeasuringUnits("size_units", "size", GETPOSTISSET('size_units') ? GETPOST('size_units', 'alpha') : '0', 0, 2);
+					print $formproduct->selectMeasuringUnits("size_units", "size", GETPOSTISSET('size_units') ? GETPOST('size_units', 'alpha') : (GETPOST('size_units', 'alpha') ?: '0'), 0, 2);
 					print '</td></tr>';
 				}
 				if (!getDolGlobalString('PRODUCT_DISABLE_SURFACE')) {
 					// Brut Surface
 					print '<tr><td>'.$langs->trans("Surface").'</td><td>';
 					print '<input name="surface" size="4" value="'.GETPOST('surface').'">';
-					print $formproduct->selectMeasuringUnits("surface_units", "surface", GETPOSTISSET('surface_units') ? GETPOST('surface_units', 'alpha') : '0', 0, 2);
+					print $formproduct->selectMeasuringUnits("surface_units", "surface", GETPOSTISSET('surface_units') ? GETPOST('surface_units', 'alpha') : (GETPOST('surface_units', 'alpha') ?: '0'), 0, 2);
 					print '</td></tr>';
 				}
 				if (!getDolGlobalString('PRODUCT_DISABLE_VOLUME')) {
 					// Brut Volume
 					print '<tr><td>'.$langs->trans("Volume").'</td><td>';
 					print '<input name="volume" size="4" value="'.GETPOST('volume').'">';
-					print $formproduct->selectMeasuringUnits("volume_units", "volume", GETPOSTISSET('volume_units') ? GETPOST('volume_units', 'alpha') : '0', 0, 2);
+					print $formproduct->selectMeasuringUnits("volume_units", "volume", GETPOSTISSET('volume_units') ? GETPOST('volume_units', 'alpha') : (GETPOST('volume_units', 'alpha') ?: '0'), 0, 2);
 					print '</td></tr>';
 				}
 
@@ -1676,7 +1710,7 @@ if (is_object($objcanvas) && $objcanvas->displayCanvasExists($canvasdisplayactio
 					// Net Measure
 					print '<tr><td>'.$langs->trans("NetMeasure").'</td><td>';
 					print '<input name="net_measure" size="4" value="'.GETPOST('net_measure').'">';
-					print $formproduct->selectMeasuringUnits("net_measure_units", '', GETPOSTISSET('net_measure_units') ? GETPOST('net_measure_units', 'alpha') : (!getDolGlobalString('MAIN_WEIGHT_DEFAULT_UNIT') ? 0 : getDolGlobalString('MAIN_WEIGHT_DEFAULT_UNIT')), 0, 0);
+					print $formproduct->selectMeasuringUnits("net_measure_units", '', GETPOSTISSET('net_measure_units') ? GETPOST('net_measure_units', 'alpha') : (GETPOST('net_measure_units', 'alpha') ?: getDolGlobalString('MAIN_WEIGHT_DEFAULT_UNIT', 0)), 0, 0);
 					print '</td></tr>';
 				}
 			}
@@ -1740,7 +1774,6 @@ if (is_object($objcanvas) && $objcanvas->displayCanvasExists($canvasdisplayactio
 			$doleditor->Create();
 
 			print "</td></tr>";
-			//}
 
 			if (isModEnabled('category')) {
 				// Categories
@@ -1763,6 +1796,7 @@ if (is_object($objcanvas) && $objcanvas->displayCanvasExists($canvasdisplayactio
 					print '<tr><td class="titlefieldcreate">'.$langs->trans("VATRate").'</td><td>';
 					$defaultva = get_default_tva($mysoc, $mysoc);
 					print $form->load_tva("tva_tx", $defaultva, $mysoc, $mysoc, 0, 0, '', false, 1);
+					print ajax_combobox("tva_tx");
 					print '</td></tr>';
 
 					print '</table>';
@@ -1775,6 +1809,7 @@ if (is_object($objcanvas) && $objcanvas->displayCanvasExists($canvasdisplayactio
 					print '<tr><td class="titlefieldcreate">'.$langs->trans("SellingPrice").'</td>';
 					print '<td><input name="price" class="maxwidth50" value="'.$object->price.'">';
 					print $form->selectPriceBaseType(getDolGlobalString('PRODUCT_PRICE_BASE_TYPE'), "price_base_type");
+					print ajax_combobox("select_price_base_type");
 					print '</td></tr>';
 
 					// Min price
@@ -1786,6 +1821,7 @@ if (is_object($objcanvas) && $objcanvas->displayCanvasExists($canvasdisplayactio
 					print '<tr><td>'.$langs->trans("VATRate").'</td><td>';
 					$defaultva = get_default_tva($mysoc, $mysoc);
 					print $form->load_tva("tva_tx", $defaultva, $mysoc, $mysoc, 0, 0, '', false, 1);
+					print ajax_combobox("tva_tx");
 					print '</td></tr>';
 
 					print '</table>';
@@ -1800,6 +1836,7 @@ if (is_object($objcanvas) && $objcanvas->displayCanvasExists($canvasdisplayactio
 
 			if (!getDolGlobalString('PRODUCT_DISABLE_ACCOUNTING')) {
 				if (isModEnabled('accounting')) {
+					/** @var FormAccounting $formaccounting */
 					// Accountancy_code_sell
 					print '<tr><td class="titlefieldcreate">'.$langs->trans("ProductAccountancySellCode").'</td>';
 					print '<td>';
@@ -2088,7 +2125,7 @@ if (is_object($objcanvas) && $objcanvas->displayCanvasExists($canvasdisplayactio
 							$inherited_mask_lot = getDolGlobalString('LOT_ADVANCED_MASK');
 							$inherited_mask_sn = getDolGlobalString('SN_ADVANCED_MASK');
 							print '<td id="field_mask">';
-							print $form->textwithpicto('<input type="text" class="flat minwidth175" name="batch_mask" id="batch_mask_input" value="'.$mask.'">', $tooltip, 1, 1);
+							print $form->textwithpicto('<input type="text" class="flat minwidth175" name="batch_mask" id="batch_mask_input" value="'.$mask.'">', $tooltip, 1, 'help');
 							// Add javascript to sho/hide field for custom mask
 							if (!empty($conf->use_javascript_ajax)) {
 								print '<script type="text/javascript">
@@ -2233,18 +2270,21 @@ if (is_object($objcanvas) && $objcanvas->displayCanvasExists($canvasdisplayactio
 				if ($object->isService()) {
 					// Duration
 					print '<tr><td>'.$langs->trans("Duration").'</td><td>';
-					print '<input name="duration_value" size="5" value="'.$object->duration_value.'"> ';
-					print $formproduct->selectMeasuringUnits("duration_unit", "time", $object->duration_unit, 0, 1);
+					print '<input name="duration_value" class="width50" value="'.($object->duration_value ? $object->duration_value : '').'"> ';
+
+					print $formproduct->selectMeasuringUnits("duration_unit", "time", ($object->duration_unit ? $object->duration_unit : 'h'), 0, 1);
 
 					// Mandatory period
-					print ' &nbsp; &nbsp; &nbsp; ';
-					print '<input type="checkbox" id="mandatoryperiod" name="mandatoryperiod"'.($object->mandatory_period == 1 ? ' checked="checked"' : '').'>';
+					//if ($object->duration_value > 0) {
+					print ' &nbsp; &nbsp; ';
+					//}
+					print '<input type="checkbox" class="valignmiddle" id="mandatoryperiod" name="mandatoryperiod"'.($object->mandatory_period == 1 ? ' checked="checked"' : '').'>';
 					print '<label for="mandatoryperiod">';
 					$htmltooltip = $langs->trans("mandatoryHelper");
 					if (!getDolGlobalString('SERVICE_STRICT_MANDATORY_PERIOD')) {
 						$htmltooltip .= '<br>'.$langs->trans("mandatoryHelper2");
 					}
-					print $form->textwithpicto($langs->trans("mandatoryperiod"), $htmltooltip, 1, 0);
+					print $form->textwithpicto($langs->trans("mandatoryperiod"), $htmltooltip, 1, 'info');
 					print '</label>';
 
 					print '</td></tr>';
@@ -2395,6 +2435,7 @@ if (is_object($objcanvas) && $objcanvas->displayCanvasExists($canvasdisplayactio
 
 				if (!getDolGlobalString('PRODUCT_DISABLE_ACCOUNTING')) {
 					if (isModEnabled('accounting')) {
+						/** @var FormAccounting $formaccounting */
 						// Accountancy_code_sell
 						print '<tr><td class="titlefieldcreate">'.$langs->trans("ProductAccountancySellCode").'</td>';
 						print '<td>';
@@ -2491,10 +2532,10 @@ if (is_object($objcanvas) && $objcanvas->displayCanvasExists($canvasdisplayactio
 			$titre = $langs->trans("CardProduct".$object->type);
 			$picto = ($object->type == Product::TYPE_SERVICE ? 'service' : 'product');
 
-			print dol_get_fiche_head($head, 'card', $titre, -1, $picto);
+			print dol_get_fiche_head($head, 'card', $titre, -1, $picto, 0, '', '', 0, '', 1);
 
 			$linkback = '<a href="'.DOL_URL_ROOT.'/product/list.php?restore_lastsearch_values=1&type='.$object->type.'">'.$langs->trans("BackToList").'</a>';
-			$object->next_prev_filter = "fk_product_type:=:".((int) $object->type);
+			$object->next_prev_filter = "(te.fk_product_type:=:".((int) $object->type).")";
 
 			$shownav = 1;
 			if ($user->socid && !in_array('product', explode(',', getDolGlobalString('MAIN_MODULES_FOR_EXTERNAL')))) {
@@ -2545,7 +2586,7 @@ if (is_object($objcanvas) && $objcanvas->displayCanvasExists($canvasdisplayactio
 						print $formbarcode->formBarcodeType($_SERVER['PHP_SELF'].'?id='.$object->id, $object->barcode_type, 'fk_barcode_type');
 						$fk_barcode_type = $object->barcode_type;
 					} else {
-						$object->fetch_barcode();
+						$object->fetchBarCode();
 						$fk_barcode_type = $object->barcode_type;
 						print $object->barcode_type_label ? $object->barcode_type_label : ($object->barcode ? '<div class="warning">'.$langs->trans("SetDefaultBarcodeType").'<div>' : '');
 					}
@@ -2755,25 +2796,35 @@ if (is_object($objcanvas) && $objcanvas->displayCanvasExists($canvasdisplayactio
 
 				if ($object->isService()) {
 					// Duration
-					print '<tr><td class="titlefieldmiddle">'.$langs->trans("Duration").'</td><td>';
-					print $object->duration_value;
+					require_once DOL_DOCUMENT_ROOT.'/core/class/cunits.class.php';
+					$measuringUnits = new CUnits($db);
+					$durations = [];
+					$plural = '';
 					if ($object->duration_value > 1) {
-						$dur = array("i" => $langs->trans("Minute"), "h" => $langs->trans("Hours"), "d" => $langs->trans("Days"), "w" => $langs->trans("Weeks"), "m" => $langs->trans("Months"), "y" => $langs->trans("Years"));
-					} elseif ($object->duration_value > 0) {
-						$dur = array("i" => $langs->trans("Minute"), "h" => $langs->trans("Hour"), "d" => $langs->trans("Day"), "w" => $langs->trans("Week"), "m" => $langs->trans("Month"), "y" => $langs->trans("Year"));
+						$plural = 's';
 					}
-					print(!empty($object->duration_unit) && isset($dur[$object->duration_unit]) ? "&nbsp;".$langs->trans($dur[$object->duration_unit])."&nbsp;" : '');
+					$result = $measuringUnits->fetchAll('', 'scale', 0, 0, ['t.active' => 1, 't.unit_type' => 'time']);
+					if ($result !== -1) {
+						foreach ($measuringUnits->records as $record) {
+							$durations[$record->short_label] = dol_ucfirst($record->label) . $plural;
+						}
+					}
+					print '<tr><td class="titlefieldmiddle">'.$langs->trans("Duration").'</td><td>';
+					if ($object->duration_value) {
+						print $object->duration_value;
+						print(!empty($object->duration_unit) && isset($durations[$object->duration_unit]) ? "&nbsp; ".$langs->trans($durations[$object->duration_unit])."&nbsp;" : '');
+					}
 
 					// Mandatory period
-					if ($object->duration_value > 0) {
-						print ' &nbsp; &nbsp; &nbsp; ';
-					}
 					$htmltooltip = $langs->trans("mandatoryHelper");
 					if (!getDolGlobalString('SERVICE_STRICT_MANDATORY_PERIOD')) {
 						$htmltooltip .= '<br>'.$langs->trans("mandatoryHelper2");
 					}
-					print '<input type="checkbox" class="" name="mandatoryperiod"'.($object->mandatory_period == 1 ? ' checked="checked"' : '').' disabled>';
-					print $form->textwithpicto($langs->trans("mandatoryperiod"), $htmltooltip, 1, 0);
+					if ($object->duration_value > 0) {
+						print ' &nbsp; &nbsp; ';
+					}
+					print '<input type="checkbox" class="valignmiddle" name="mandatoryperiod"'.($object->mandatory_period == 1 ? ' checked="checked"' : '').' disabled>';
+					print $form->textwithpicto($langs->trans("mandatoryperiod"), $htmltooltip, 1, 'info');
 
 					print '</td></tr>';
 				} else {
@@ -3000,6 +3051,9 @@ if ($action != 'create' && $action != 'edit') {
 				print dolGetButtonAction('', $langs->trans('Modify'), 'default', $_SERVER["PHP_SELF"].'?action=edit&token='.newToken().'&id='.$object->id, '', $usercancreate);
 			}
 
+			//Send
+			print dolGetButtonAction('', $langs->trans('SendMail'), 'default', $_SERVER["PHP_SELF"] . '?id=' . $object->id . '&action=presend&mode=init&token=' . newToken() . '#formmailbeforetitle');
+
 			if (!isset($hookmanager->resArray['no_button_copy']) || $hookmanager->resArray['no_button_copy'] != 1) {
 				if (!empty($conf->use_javascript_ajax) && empty($conf->dol_use_jmobile)) {
 					$cloneProductUrl = '';
@@ -3139,6 +3193,10 @@ if (getDolGlobalString('PRODUCT_ADD_FORM_ADD_TO') && $object->id && ($action == 
  * Generated documents
  */
 
+if (GETPOST('modelselected')) {
+	$action = 'presend';
+}
+
 if ($action != 'create' && $action != 'edit' && $action != 'delete') {
 	print '<div class="fichecenter"><div class="fichehalfleft">';
 	print '<a name="builddoc"></a>'; // ancre
@@ -3171,6 +3229,14 @@ if ($action != 'create' && $action != 'edit' && $action != 'delete') {
 	$somethingshown = $formactions->showactions($object, 'product', 0, 1, '', $MAXEVENT, '', $morehtmlcenter); // Show all action for product
 
 	print '</div></div>';
+
+	// Presend form
+	$modelmail = 'product_send';
+	$defaulttopic = $object->label;
+	$diroutput = $conf->product->multidir_output[$object->entity];
+	$trackid = 'prod' . $object->id;
+
+	include DOL_DOCUMENT_ROOT.'/core/tpl/card_presend.tpl.php';
 }
 
 // End of page
