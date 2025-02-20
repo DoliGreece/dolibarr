@@ -17,7 +17,7 @@
  * Copyright (C) 2018-2025  Frédéric France         <frederic.france@free.fr>
  * Copyright (C) 2022       Gauthier VERDOL         <gauthier.verdol@atm-consulting.fr>
  * Copyright (C) 2023       Nick Fragoulis
- * Copyright (C) 2024       MDW                     <mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2024-2025	MDW                     <mdeweerd@users.noreply.github.com>
  * Copyright (C) 2024       Alexandre Spangaro      <alexandre@inovea-conseil.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -892,27 +892,27 @@ if (empty($reshook)) {
 					$keyforvatrate = $line->tva_tx.($line->vat_src_code ? ' ('.$line->vat_src_code.')' : '');
 
 					if (!isset($amount_ht[$keyforvatrate])) {
-						$amount_ht[$keyforvatrate]=0;
+						$amount_ht[$keyforvatrate] = 0;
 					}
 					$amount_ht[$keyforvatrate] += $line->total_ht;
 					if (!isset($amount_tva[$keyforvatrate])) {
-						$amount_tva[$keyforvatrate]=0;
+						$amount_tva[$keyforvatrate] = 0;
 					}
 					$amount_tva[$keyforvatrate] += $line->total_tva;
 					if (!isset($amount_ttc[$keyforvatrate])) {
-						$amount_ttc[$keyforvatrate]=0;
+						$amount_ttc[$keyforvatrate] = 0;
 					}
 					$amount_ttc[$keyforvatrate] += $line->total_ttc;
 					if (!isset($multicurrency_amount_ht[$keyforvatrate])) {
-						$multicurrency_amount_ht[$keyforvatrate]=0;
+						$multicurrency_amount_ht[$keyforvatrate] = 0;
 					}
 					$multicurrency_amount_ht[$keyforvatrate] += $line->multicurrency_total_ht;
 					if (!isset($multicurrency_amount_tva[$keyforvatrate])) {
-						$multicurrency_amount_tva[$keyforvatrate]=0;
+						$multicurrency_amount_tva[$keyforvatrate] = 0;
 					}
 					$multicurrency_amount_tva[$keyforvatrate] += $line->multicurrency_total_tva;
 					if (!isset($multicurrency_amount_ttc[$keyforvatrate])) {
-						$multicurrency_amount_ttc[$keyforvatrate]=0;
+						$multicurrency_amount_ttc[$keyforvatrate] = 0;
 					}
 					$multicurrency_amount_ttc[$keyforvatrate] += $line->multicurrency_total_ttc;
 					$i++;
@@ -1413,8 +1413,9 @@ if (empty($reshook)) {
 				$object->date_pointoftax    = $date_pointoftax;
 				$object->note_public        = trim(GETPOST('note_public', 'restricthtml'));
 				$object->note_private       = trim(GETPOST('note_private', 'restricthtml'));
+
 				$object->ref_customer       = GETPOST('ref_client');
-				$object->ref_client         = $object->ref_customer;
+
 				$object->model_pdf          = GETPOST('model');
 				$object->fk_project         = GETPOSTINT('projectid');
 				$object->cond_reglement_id	= (GETPOSTINT('type') == 3 ? 1 : GETPOST('cond_reglement_id'));
@@ -3319,7 +3320,13 @@ if ($action == 'create') {
 			$objectsrc->fetch_thirdparty();
 
 			$projectid = (!empty($projectid) ? $projectid : $objectsrc->fk_project);
-			$ref_client = (!empty($objectsrc->ref_client) ? $objectsrc->ref_client : (!empty($objectsrc->ref_customer) ? $objectsrc->ref_customer : ''));
+
+			// Propagate ref customer of src object to the invoice ?
+			if (getDolGlobalString("INVOICE_DO_NOT_PROPAGATE_REF_CUSTOMER_Of_SRC_TO_INVOICE")) {
+				$ref_client = "";
+			} else {
+				$ref_client = (!empty($objectsrc->ref_client) ? $objectsrc->ref_client : (!empty($objectsrc->ref_customer) ? $objectsrc->ref_customer : ''));
+			}
 
 			// only if socid not filled else it's already done above
 			if (empty($socid)) {
@@ -3329,8 +3336,6 @@ if ($action == 'create') {
 			$dateinvoice = (empty($dateinvoice) ? (!getDolGlobalString('MAIN_AUTOFILL_DATE') ? -1 : '') : $dateinvoice);
 
 			if ($element == 'expedition') {
-				$ref_client = (!empty($objectsrc->ref_customer) ? $objectsrc->ref_customer : '');
-
 				$elem = $subelem = $objectsrc->origin;
 				$expeoriginid = $objectsrc->origin_id;
 				dol_include_once('/'.$elem.'/class/'.$subelem.'.class.php');
@@ -4070,7 +4075,7 @@ if ($action == 'create') {
 			$langs->load('projects');
 			print '<tr><td>'.$langs->trans('Project').'</td><td colspan="2">';
 			print img_picto('', 'project', 'class="pictofixedwidth"');
-			print $formproject->select_projects(($socid > 0 ? $socid : -1), $projectid, 'projectid', 0, 0, 1, 1, 0, 0, 0, '', 1, 0, 'maxwidth500 widthcentpercentminusxx');
+			print $formproject->select_projects(($socid > 0 ? $socid : -1), (string) $projectid, 'projectid', 0, 0, 1, 1, 0, 0, 0, '', 1, 0, 'maxwidth500 widthcentpercentminusxx');
 			print ' <a href="'.DOL_URL_ROOT.'/projet/card.php?socid='.$soc->id.'&action=create&status=1&backtopage='.urlencode($_SERVER["PHP_SELF"].'?action=create&socid='.$soc->id.($fac_rec ? '&fac_rec='.$fac_rec : '')).'"><span class="fa fa-plus-circle valignmiddle" title="'.$langs->trans("AddProject").'"></span></a>';
 			print '</td></tr>';
 		}
@@ -4235,21 +4240,23 @@ if ($action == 'create') {
 				echo ' - '.$langs->trans('LatestRelatedBill').' '.end($objectsrc->linkedObjects['facture'])->getNomUrl(1);
 			}
 			echo '</td></tr>';
-			print '<tr><td>'.$langs->trans('AmountHT').'</td><td colspan="2">'.price($objectsrc->total_ht).'</td></tr>';
-			print '<tr><td>'.$langs->trans('AmountVAT').'</td><td colspan="2">'.price($objectsrc->total_tva)."</td></tr>";
+
+			print '<tr><td>'.$langs->trans('AmountHT').'</td><td colspan="2">'.price($objectsrc->total_ht, 1, $langs, 1, -1, '', $conf->currency).'</td></tr>';
+			print '<tr><td>'.$langs->trans('AmountVAT').'</td><td colspan="2">'.price($objectsrc->total_tva, 1, $langs, 1, -1, '', $conf->currency)."</td></tr>";
 			if ($mysoc->localtax1_assuj == "1" || $objectsrc->total_localtax1 != 0) {		// Localtax1
-				print '<tr><td>'.$langs->transcountry("AmountLT1", $mysoc->country_code).'</td><td colspan="2">'.price($objectsrc->total_localtax1)."</td></tr>";
+				print '<tr><td>'.$langs->transcountry("AmountLT1", $mysoc->country_code).'</td><td colspan="2">'.price($objectsrc->total_localtax1, 1, $langs, 1, -1, '', $conf->currency)."</td></tr>";
 			}
 
 			if ($mysoc->localtax2_assuj == "1" || $objectsrc->total_localtax2 != 0) {		// Localtax2
-				print '<tr><td>'.$langs->transcountry("AmountLT2", $mysoc->country_code).'</td><td colspan="2">'.price($objectsrc->total_localtax2)."</td></tr>";
+				print '<tr><td>'.$langs->transcountry("AmountLT2", $mysoc->country_code).'</td><td colspan="2">'.price($objectsrc->total_localtax2, 1, $langs, 1, -1, '', $conf->currency)."</td></tr>";
 			}
-			print '<tr><td>'.$langs->trans('AmountTTC').'</td><td colspan="2">'.price($objectsrc->total_ttc)."</td></tr>";
+			print '<tr><td>'.$langs->trans('AmountTTC').'</td><td colspan="2">'.price($objectsrc->total_ttc, 1, $langs, 1, -1, '', $conf->currency)."</td></tr>";
 
-			if (isModEnabled('multicurrency')) {
-				print '<tr><td>'.$langs->trans('MulticurrencyAmountHT').'</td><td colspan="2">'.price($objectsrc->multicurrency_total_ht).'</td></tr>';
-				print '<tr><td>'.$langs->trans('MulticurrencyAmountVAT').'</td><td colspan="2">'.price($objectsrc->multicurrency_total_tva)."</td></tr>";
-				print '<tr><td>'.$langs->trans('MulticurrencyAmountTTC').'</td><td colspan="2">'.price($objectsrc->multicurrency_total_ttc)."</td></tr>";
+			if (isModEnabled('multicurrency') && $objectsrc->multicurrency_code != $conf->currency) {
+				//var_dump($objectsrc);
+				print '<tr><td>'.$langs->trans('MulticurrencyAmountHT').'</td><td colspan="2">'.price($objectsrc->multicurrency_total_ht, 1, $langs, 1, -1, '', $objectsrc->multicurrency_code).'</td></tr>';
+				print '<tr><td>'.$langs->trans('MulticurrencyAmountVAT').'</td><td colspan="2">'.price($objectsrc->multicurrency_total_tva, 1, $langs, 1, -1, '', $objectsrc->multicurrency_code)."</td></tr>";
+				print '<tr><td>'.$langs->trans('MulticurrencyAmountTTC').'</td><td colspan="2">'.price($objectsrc->multicurrency_total_ttc, 1, $langs, 1, -1, '', $objectsrc->multicurrency_code)."</td></tr>";
 			}
 		}
 
