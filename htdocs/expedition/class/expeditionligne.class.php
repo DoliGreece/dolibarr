@@ -374,7 +374,7 @@ class ExpeditionLigne extends CommonObjectLine
 	{
 		global $langs;
 		$error = 0;
-		$origin_id = null;
+		$origin_id = $this->origin_id;
 		if ($origin_id > 0) {
 			// Check parameters
 			if (empty($this->fk_expedition)
@@ -656,7 +656,7 @@ class ExpeditionLigne extends CommonObjectLine
 		$batch = null;
 		$batch_id = 0;
 		$expedition_batch_id = 0;
-		$origin_id = null;
+		$origin_id = $this->origin_id;
 		if ($origin_id > 0) {
 			if (is_array($this->detail_batch)) { 	// array of ExpeditionLineBatch
 				if (count($this->detail_batch) > 1) {
