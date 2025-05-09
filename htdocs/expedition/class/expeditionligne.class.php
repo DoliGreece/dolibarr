@@ -370,7 +370,7 @@ class ExpeditionLigne extends CommonObjectLine
 	 *	@param      int		$notrigger		1 = disable triggers
 	 *	@return     int						Return integer <0 if KO, line id >0 if OK
 	 */
-	public function insert($user, $notrigger = 0)
+	public function insert($user = null, $notrigger = 0)
 	{
 		global $langs;
 		$error = 0;
