@@ -1290,7 +1290,7 @@ class Expedition extends CommonObject
 			$this->db->begin();
 
 			// Rang to use
-			$ranktouse = $rang;
+			$ranktouse = (int) $rang;
 			if ($ranktouse == -1) {
 				$rangmax = $this->line_max($fk_parent);
 				$ranktouse = $rangmax + 1;
