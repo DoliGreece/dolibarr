@@ -1271,7 +1271,7 @@ class Expedition extends CommonObject
 	 * @param 	?int	$fk_unit 						Code of the unit to use.
 	 * @param   int		$rang             				Position of line
 	 * @param 	string	$description					Description of line product
-	 * @param 	string	$fk_parent					    ID of parent line. For a hierarchy of lines.
+	 * @param 	int		$fk_parent					    ID of parent line. For a hierarchy of lines.
 	 * @param	array<string,mixed>	$array_options		extrafields array
 	 * @return	int										Return integer <0 if KO, >0 if OK
 	 */
@@ -1350,7 +1350,7 @@ class Expedition extends CommonObject
 	 * @param 	?int	$fk_unit 						Code of the unit to use.
 	 * @param   int		$rang             				Position of line
 	 * @param 	string	$description					Description of line product
-	 * @param 	string	$fk_parent					    ID of parent line. For a hierarchy of lines.
+	 * @param 	int		$fk_parent					    ID of parent line. For a hierarchy of lines.
 	 * @param	int		$notrigger						Disable line update trigger
 	 * @param	array<string,mixed>	$array_options		extrafields array
 	 * @return	int										Return integer <0 if KO, >0 if OK
