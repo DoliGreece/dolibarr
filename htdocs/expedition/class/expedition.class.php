@@ -1275,7 +1275,7 @@ class Expedition extends CommonObject
 	 * @param	array<string,mixed>	$array_options		extrafields array
 	 * @return	int										Return integer <0 if KO, >0 if OK
 	 */
-	public function addlinefree($qty, $element_type, $fk_product, $fk_unit, $rang, $description, fk_parent, $array_options = [])
+	public function addlinefree($qty, $element_type, $fk_product, $fk_unit, $rang, $description, $fk_parent, $array_options = [])
 	{
 		global $mysoc, $conf, $langs;
 
