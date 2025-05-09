@@ -1277,7 +1277,7 @@ class Expedition extends CommonObject
 	 */
 	public function addlinefree($qty, $element_type, $fk_product, $fk_unit, $rang, $description, $fk_parent, $array_options = [])
 	{
-		global $mysoc, $conf, $langs;
+		global $mysoc, $langs, $user;
 
 		if ($this->status == self::STATUS_DRAFT) {
 
