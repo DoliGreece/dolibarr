@@ -1284,12 +1284,13 @@ class Expedition extends CommonObject
 			if (empty($rang)) {
 				$rang = 0;
 			}
-
+			$ranktouse = 0;
 			$qty = (float) price2num($qty);
 
 			$this->db->begin();
 
 			// Rang to use
+			
 			$ranktouse = (int) $rang;
 			if ($ranktouse == -1) {
 				$rangmax = $this->line_max($fk_parent);
