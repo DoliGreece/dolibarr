@@ -1271,10 +1271,11 @@ class Expedition extends CommonObject
 	 * @param 	?int	$fk_unit 						Code of the unit to use.
 	 * @param   int		$rang             				Position of line
 	 * @param 	string	$description					Description of line product
+	 * @param 	string	$fk_parent					    ID of parent line. For a hierarchy of lines.
 	 * @param	array<string,mixed>	$array_options		extrafields array
 	 * @return	int										Return integer <0 if KO, >0 if OK
 	 */
-	public function addlinefree($qty, $element_type, $fk_product, $fk_unit, $rang, $description, $array_options = [])
+	public function addlinefree($qty, $element_type, $fk_product, $fk_unit, $rang, $description, fk_parent, $array_options = [])
 	{
 		global $mysoc, $conf, $langs;
 
@@ -1291,7 +1292,7 @@ class Expedition extends CommonObject
 			// Rang to use
 			$ranktouse = $rang;
 			if ($ranktouse == -1) {
-				$rangmax = $this->line_max($fk_elementdet);
+				$rangmax = $this->line_max($fk_parent);
 				$ranktouse = $rangmax + 1;
 			}
 
@@ -1312,7 +1313,7 @@ class Expedition extends CommonObject
 			$result = $this->line->insert($user);
 			if ($result > 0) {
 				if (!isset($this->context['createfromclone'])) {
-					if (!empty($fk_elementdet)) {
+					if (!empty($fk_parent)) {
 						$this->line_order(true, 'DESC');
 					} elseif ($ranktouse > 0 && $ranktouse <= count($this->lines)) {
 						$linecount = count($this->lines);
@@ -1343,18 +1344,19 @@ class Expedition extends CommonObject
 	 *
   	 * @param 	int		$rowid							Id of line to update
 	 * @param 	float	$qty							Quantity
-	 * @param 	string	$element_type					Quantity
+	 * @param 	string	$element_type					Element type
 	 * @param	int		$fk_product      				Id of product
 	 * @param 	?int	$fk_unit 						Code of the unit to use.
 	 * @param   int		$rang             				Position of line
 	 * @param 	string	$description					Description of line product
+	 * @param 	string	$fk_parent					    ID of parent line. For a hierarchy of lines.
 	 * @param	int		$notrigger						Disable line update trigger
 	 * @param	array<string,mixed>	$array_options		extrafields array
 	 * @return	int										Return integer <0 if KO, >0 if OK
 	 */
-	public function updatelinefree($rowid, $qty, $element_type, $fk_product, $fk_unit, $rang, $description, $notrigger, $array_options = array())
+	public function updatelinefree($rowid, $qty, $element_type, $fk_product, $fk_unit, $rang, $description, $fk_parent, $notrigger, $array_options = array())
 	{
-    	global $mysoc, $langs;
+    	global $mysoc, $langs, $user;
 
 		if ($this->status == self::STATUS_DRAFT) {
 
@@ -1370,12 +1372,6 @@ class Expedition extends CommonObject
 			$qty = (float) $qty;
 			$description = trim($description);
 
-        	// Check parameters
-        	if ($type < 0) {
-            	dol_syslog("updatelinefree error: invalid type parameter", LOG_ERR);
-            	return -1;
-        	}
-
 			// Fetch current line from the database and then clone the object and set it in $oldline property
 			$line = new ExpeditionLigne($this->db);
 
@@ -1387,7 +1383,6 @@ class Expedition extends CommonObject
 				$result = $product->fetch($line->fk_product);
 				$product_type = $product->type;
 			}
-
 
 			$staticline = clone $line;
 
@@ -1401,6 +1396,7 @@ class Expedition extends CommonObject
 			$this->line->fk_product = $fk_product;
 			$this->line->qty = $qty;
 			$this->line->fk_unit = $fk_unit;
+			$this->line->fk_parent = $fk_parent;
 			$this->line->description = $description;
 			$this->line->rang = $ranktouse;
 
@@ -1415,7 +1411,7 @@ class Expedition extends CommonObject
 			$result = $this->line->update($user, $notrigger);
 			if ($result > 0) {
 				// Reorder if child line
-				if (!empty($fk_elementdet)) {
+				if (!empty($fk_parent)) {
 					$this->line_order(true, 'DESC');
 				}
 
