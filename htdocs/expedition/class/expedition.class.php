@@ -637,6 +637,23 @@ class Expedition extends CommonObject
 					}
 				}
 
+				// update ref
+				$initialref = '(PROV'.$this->id.')';
+				if (!empty($this->ref)) {
+					$initialref = $this->ref;
+				}
+
+				$sql = 'UPDATE '.MAIN_DB_PREFIX.$this->table_element." SET ref='".$this->db->escape($initialref)."' WHERE rowid=".((int) $this->id);
+				if ($this->db->query($sql)) {
+					$this->ref = $initialref;
+					}
+				if (!$error && $this->id && $this->origin_id) {
+					$ret = $this->add_object_linked();
+					if (!$ret) {
+						$error++;
+					}
+				}
+
 				if (!$error && $this->id && $this->origin_id) {
 					$ret = $this->add_object_linked();
 					if (!$ret) {
@@ -922,7 +939,7 @@ class Expedition extends CommonObject
 				/*
 				 * Lines
 				 */
-				if (empty($origin_id)) {
+				if (empty($obj->origin_id)) {
 					$result = $this->fetch_lines_free();
 				} else {	
 					$result = $this->fetch_lines();
@@ -1249,7 +1266,7 @@ class Expedition extends CommonObject
 	 * Add a simple expedition line.
 	 *
 	 * @param 	float	$qty							Quantity
-	 * @param 	string	$element_type					Quantity
+	 * @param 	string	$element_type					Element type
 	 * @param	int		$fk_product      				Id of product
 	 * @param 	?int	$fk_unit 						Code of the unit to use.
 	 * @param   int		$rang             				Position of line
@@ -1257,7 +1274,7 @@ class Expedition extends CommonObject
 	 * @param	array<string,mixed>	$array_options		extrafields array
 	 * @return	int										Return integer <0 if KO, >0 if OK
 	 */
-	public function addlinefree($qty, $element_type = 'shipping', $fk_product, $fk_unit, $rang = -1, $description, $array_options = [])
+	public function addlinefree($qty, $element_type, $fk_product, $fk_unit, $rang, $description, $array_options = [])
 	{
 		global $mysoc, $conf, $langs;
 
@@ -1324,16 +1341,18 @@ class Expedition extends CommonObject
 	/**
 	 * Add a simple expedition line.
 	 *
+  	 * @param 	int		$rowid							Id of line to update
 	 * @param 	float	$qty							Quantity
 	 * @param 	string	$element_type					Quantity
 	 * @param	int		$fk_product      				Id of product
 	 * @param 	?int	$fk_unit 						Code of the unit to use.
 	 * @param   int		$rang             				Position of line
 	 * @param 	string	$description					Description of line product
+	 * @param	int		$notrigger						Disable line update trigger
 	 * @param	array<string,mixed>	$array_options		extrafields array
 	 * @return	int										Return integer <0 if KO, >0 if OK
 	 */
-	public function updatelinefree($rowid, $qty, $element_type, $fk_product, $fk_unit = null, $rang = 0, $description, $notrigger = 0, $array_options = array())
+	public function updatelinefree($rowid, $qty, $element_type, $fk_product, $fk_unit, $rang, $description, $notrigger, $array_options = array())
 	{
     	global $mysoc, $langs;
 
