@@ -1302,6 +1302,7 @@ class Expedition extends CommonObject
 			$this->line->element_type = $element_type;
 			$this->line->fk_product = $fk_product;
 			$this->line->description = $description;
+			$this->line->fk_parent = $fk_parent;
 			$this->line->qty = (float) $qty;
 			$this->line->fk_unit = $fk_unit; 
 			$this->line->rang = $ranktouse;
