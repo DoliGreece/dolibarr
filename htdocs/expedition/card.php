@@ -311,7 +311,6 @@ if (empty($reshook)) {
 			$object->model_pdf = GETPOST('model');
 			$object->date_delivery = $date_delivery; // Date delivery planned
 			$object->date_shipping = $date_shipping; // Sending date
-			$object->fk_delivery_address = $fk_delivery_address;
 			$object->shipping_method_id = GETPOSTINT('shipping_method_id');
 			$object->tracking_number = GETPOST('tracking_number', 'alpha');
 			$object->note = GETPOST('note', 'restricthtml'); // deprecated
@@ -791,6 +790,12 @@ if (empty($reshook)) {
 			$object->fetch_thirdparty();
 		
 			$qty = GETPOST('qty', 'alpha');
+			$description = '';
+			$fk_parent = 0;
+			$element_type = 'shipping';
+			$fk_unit = '';
+			$fk_product = 0;
+			$rang = '';
 
 			// Extrafields
 			$extralabelsline = $extrafields->fetch_name_optionals_label($object->table_element_line);
@@ -1364,6 +1369,7 @@ if ($action == 'create'&& $usercancreate) {
 		} else {
 			print '<td class="valuefieldcreate">';
 			$filter = '';
+			$mode = '';
 			if ($mode == 'customer') {
 				$filter = '(s.client:IN:1,2,3)';
 			}
