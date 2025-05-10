@@ -48,7 +48,7 @@
  * @var string $action
  */
 '
-@phan-var-force Line $line
+@phan-var-force expeditionligne $line
 @phan-var-force int $num
 @phan-var-force int $i
 @phan-var-force CommonObject $this
