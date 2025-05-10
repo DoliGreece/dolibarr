@@ -795,7 +795,7 @@ if (empty($reshook)) {
 			$element_type = 'shipping';
 			$fk_unit = '';
 			$fk_product = 0;
-			$rang = '';
+			$rang = 0;
 
 			// Extrafields
 			$extralabelsline = $extrafields->fetch_name_optionals_label($object->table_element_line);
