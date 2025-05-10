@@ -311,7 +311,7 @@ if (empty($reshook)) {
 			$object->model_pdf = GETPOST('model');
 			$object->date_delivery = $date_delivery; // Date delivery planned
 			$object->date_shipping = $date_shipping; // Sending date
-			$object->fk_delivery_address = $object->fk_delivery_address;
+			$object->fk_delivery_address = $fk_delivery_address;
 			$object->shipping_method_id = GETPOSTINT('shipping_method_id');
 			$object->tracking_number = GETPOST('tracking_number', 'alpha');
 			$object->note = GETPOST('note', 'restricthtml'); // deprecated
@@ -1088,13 +1088,12 @@ if (empty($reshook)) {
         // Set if we used free entry or predefined product
 		$predef = '';
 		$description = '';
-        $fk_parent = '';
+        $fk_parent = 0;
         $fk_elementdet = '';
         $element_type = 'shipping';
 		$fk_unit = '';
         $idprod = 0; 
         $fk_product = 0;
-        $qty = '';
         $fk_entrepot = '';
         $rang = '';
 
