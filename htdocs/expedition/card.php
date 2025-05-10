@@ -1370,10 +1370,10 @@ if ($action == 'create'&& $usercancreate) {
 			print '<td class="valuefieldcreate">';
 			$filter = '';
 			$mode = '';
-			if ($mode == 'customer') {
+			if ($mode === 'customer') {
 				$filter = '(s.client:IN:1,2,3)';
 			}
-			if ($mode == 'supplier') {
+			if ($mode === 'supplier') {
 				$filter = '(s.fournisseur:=:1)';
 			}
 			print img_picto('', 'company', 'class="pictofixedwidth"').$form->select_company('', 'socid', $filter, 'SelectThirdParty', 1, 0, array(), 0, 'minwidth175 maxwidth500 widthcentpercentminusxx');
