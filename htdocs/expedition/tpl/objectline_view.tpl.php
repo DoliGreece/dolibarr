@@ -107,21 +107,12 @@ $coldisplay++;
 $tmpproduct = new Product($object->db);
 $tmpproduct->fetch($line->fk_product);
 $tmpexpe = new Expedition($object->db);
-$res = $tmpexpe->fetch($line->description);
-	if ($line->fk_product > 0) {
-
-		print $tmpproduct->getNomUrl(1);
-		print ' - '.$tmpproduct->label;
-	
-		
-		
-	} else {
-
-		print $tmpproduct->getNomUrl(1);
+if ($line->fk_product > 0) {
+	print $tmpproduct->getNomUrl(1);
+	print ' - '.$tmpproduct->label;	
+} else {
 	print ' - '.$line->description;	
 }
-
-
 print '</td>';
 
 // Qty
@@ -154,12 +145,11 @@ if ($this->status == 0 && $user->hasRight('expedition', 'write') && $action != '
 
 	print '<td class="linecoldelete center">';
 	$coldisplay++;
-	if (($line->fk_prev_id == null) && empty($disableremove)) {
-		//La suppression n'est autorisée que si il n'y a pas de ligne dans une précédente situation
-		print '<a class="reposition" href="'.$_SERVER["PHP_SELF"].'?id='.$this->id.'&action=deleteline&token='.newToken().'&lineid='.$line->id.'">';
-		print img_delete();
-		print '</a>';
-	}
+
+	print '<a class="reposition" href="'.$_SERVER["PHP_SELF"].'?id='.$this->id.'&action=deleteline&token='.newToken().'&lineid='.$line->id.'">';
+	print img_delete();
+	print '</a>';
+
 	print '</td>';
 
 	if ($num > 1 && $conf->browser->layout != 'phone' && empty($disablemove)) {
