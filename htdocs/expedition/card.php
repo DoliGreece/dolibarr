@@ -1244,7 +1244,7 @@ if (empty($reshook)) {
 
             if (!$error) {
                 // Insert line
-                $result = $object->addlinefree($qty, $element_type, $idprod, $fk_unit, min($rank, count($object->lines) + 1), $description, $fk_parent, $array_options);
+                $result = $object->addlinefree((float) $qty, $element_type, $idprod, $fk_unit, min($rank, count($object->lines) + 1), $description, $fk_parent, $array_options);
 
 				if ($result > 0) {
 					$ret = $object->fetch($object->id); // Reload to get new records
