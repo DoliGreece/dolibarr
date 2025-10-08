@@ -47,7 +47,7 @@ $langs->loadLangs(array("admin", "cron", "bills", "members"));
 $action = GETPOST('action', 'aZ09');
 $massaction = GETPOST('massaction', 'alpha'); // The bulk action (combo box choice into lists)
 $confirm = GETPOST('confirm', 'alpha');
-$toselect   = GETPOST('toselect', 'array'); // Array of ids of elements selected into a list
+$toselect   = GETPOST('toselect', 'array:int'); // Array of ids of elements selected into a list
 $contextpage = GETPOST('contextpage', 'aZ') ? GETPOST('contextpage', 'aZ') : 'cronjoblist'; // To manage different context of search
 
 $id = GETPOSTINT('id');
@@ -161,7 +161,7 @@ if (empty($reshook)) {
 
 	// Execute jobs
 	if ($action == 'confirm_execute' && $confirm == "yes" && $permissiontoexecute) {
-		if (getDolGlobalString('CRON_KEY') && $conf->global->CRON_KEY != $securitykey) {
+		if (getDolGlobalString('CRON_KEY') && getDolGlobalString('CRON_KEY') != $securitykey) {
 			setEventMessages('Security key '.$securitykey.' is wrong', null, 'errors');
 			$action = '';
 		} else {
@@ -331,7 +331,7 @@ $nbtotalofrecords = '';
 if (!getDolGlobalInt('MAIN_DISABLE_FULL_SCANLIST')) {
 	$result = $db->query($sql);
 	$nbtotalofrecords = $db->num_rows($result);
-	if (($page * $limit) > $nbtotalofrecords) {	// if total resultset is smaller then paging size (filtering), goto and load page 0
+	if (($page * $limit) > (int) $nbtotalofrecords) {	// if total resultset is smaller then paging size (filtering), goto and load page 0
 		$page = 0;
 		$offset = 0;
 	}
@@ -403,7 +403,7 @@ $massactionbutton = $form->selectMassAction('', $arrayofmassactions);
 
 $head = [];
 if ($mode == 'modulesetup') {
-	$linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1">'.$langs->trans("BackToModuleList").'</a>';
+	$linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1">'.img_picto($langs->trans("BackToModuleList"), 'back', 'class="pictofixedwidth"').'<span class="hideonsmartphone">'.$langs->trans("BackToModuleList").'</span></a>';
 	print load_fiche_titre($langs->trans("CronSetup"), $linkback, 'title_setup');
 
 	// Configuration header
@@ -556,7 +556,7 @@ if ($num > 0) {
 		$datelastrun = $db->jdate($obj->datelastrun);
 		$datelastresult = $db->jdate($obj->datelastresult);
 
-		print '<tr class="oddeven">';
+		print '<tr class="oddeven row-with-select">';
 
 		// Action column
 		if (getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
@@ -580,7 +580,7 @@ if ($num > 0) {
 		print '<td class="minwidth150">';
 		if (!empty($object->label)) {
 			$object->ref = $langs->trans($object->label);
-			print '<div class="small twolinesmax minwidth150 maxwidth250 classfortooltip" title="'.dol_escape_htmltag($langs->trans($object->label), 0, 0).'">';
+			print '<div class="small twolinesmax lineheightsmall minwidth150 maxwidth250 classfortooltip" title="'.dol_escape_htmltag($langs->trans($object->label), 0, 0).'">';
 			print $object->getNomUrl(0, '', 1);
 			print '</div>';
 			$object->ref = $obj->rowid;
@@ -668,7 +668,7 @@ if ($num > 0) {
 		$datefromto = (empty($datelastrun) ? '' : dol_print_date($datelastrun, 'dayhoursec', 'tzserver')).' - '.(empty($datelastresult) ? '' : dol_print_date($datelastresult, 'dayhoursec', 'tzserver'));
 
 		// Date start last run
-		print '<td class="center" title="'.dol_escape_htmltag($datefromto).'">';
+		print '<td class="center lineheightsmall" title="'.dol_escape_htmltag($datefromto).'">';
 		if (!empty($datelastrun)) {
 			print dol_print_date($datelastrun, 'dayhoursec', 'tzserver');
 		}
@@ -685,7 +685,7 @@ if ($num > 0) {
 		// Return code of last run
 		print '<td class="center tdlastresultcode" title="'.dol_escape_htmltag($obj->lastresult).'">';
 		if ($obj->lastresult != '') {
-			if (empty($obj->lastresult)) {
+			if (empty($obj->lastresult) || $obj->status == Cronjob::STATUS_DISABLED) {
 				print $obj->lastresult;		// Print '0'
 			} else {
 				print '<span class="error">'.dol_escape_htmltag(dol_trunc($obj->lastresult)).'</div>';
@@ -696,14 +696,14 @@ if ($num > 0) {
 		// Output of last run
 		print '<td class="small minwidth150">';
 		if (!empty($obj->lastoutput)) {
-			print '<div class="twolinesmax classfortooltip" title="'.dol_escape_htmltag($obj->lastoutput, 1, 1).'">';
+			print '<div class="twolinesmax lineheightsmall classfortooltip" title="'.dol_escape_htmltag($obj->lastoutput, 1, 1).'">';
 			print dol_trunc(dolGetFirstLineOfText($obj->lastoutput, 2), 100);
 			print '</div>';
 		}
 		print '</td>';
 
 		// Next run date
-		print '<td class="center">';
+		print '<td class="center lineheightsmall">';
 		if (!empty($obj->datenextrun)) {
 			$datenextrun = $db->jdate($obj->datenextrun);
 			if (empty($obj->status)) {
