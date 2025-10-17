@@ -150,7 +150,7 @@ $help_url = 'EN:Module_Foundations|FR:Module_Adh&eacute;rents|ES:M&oacute;dulo_M
 
 llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'mod-member page-admin_emails');
 
-$linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1">'.img_picto($langs->trans("BackToModuleList"), 'back', 'class="pictofixedwidth"').'<span class="hideonsmartphone">'.$langs->trans("BackToModuleList").'</span></a>';
+$linkback = '<a href="'.dolBuildUrl(DOL_URL_ROOT.'/admin/modules.php', ['restore_lastsearch_values' => 1]).'">'.img_picto($langs->trans("BackToModuleList"), 'back', 'class="pictofixedwidth"').'<span class="hideonsmartphone">'.$langs->trans("BackToModuleList").'</span></a>';
 
 print load_fiche_titre($langs->trans("MembersSetup"), $linkback, 'title_setup');
 
@@ -180,16 +180,11 @@ print "</tr>\n";
 
 foreach ($tableau as $key => $const) {	// Loop on each param
 	$label = '';
-	// $const is a const key like 'MYMODULE_ABC'
-	if (is_array($const)) {
-		$type = $const['type'];
-		$label = $const['label'];
-		$help = $const['help'];
-		$const = $key;
-	} else {
-		$type = $const;
-		$const = $key;
-	}
+	$type = $const['type'];
+	$label = $const['label'];
+	$help = empty($const['help']) ? '' : $const['help'];
+	$const = $key;
+
 	$sql = "SELECT rowid, ".$db->decrypt('name')." as name, ".$db->decrypt('value')." as value, type, note";
 	$sql .= " FROM ".MAIN_DB_PREFIX."const";
 	$sql .= " WHERE ".$db->decrypt('name')." = '".$db->escape($const)."'";

@@ -75,6 +75,11 @@ $offset = $limit * $page;
 $pageprev = $page - 1;
 $pagenext = $page + 1;
 
+$outputdir = $conf->cron->dir_output;
+if (empty($outputdir)) {
+	$outputdir = $conf->cronjob->dir_output;
+}
+
 // Initialize technical objects
 $object = new Cronjob($db);
 $extrafields = new ExtraFields($db);
@@ -92,11 +97,6 @@ if (!$sortfield) {
 }
 if (!$sortorder) {
 	$sortorder = 'ASC,DESC';
-}
-
-$outputdir = $conf->cron->dir_output;
-if (empty($outputdir)) {
-	$outputdir = $conf->cronjob->dir_output;
 }
 
 // List of fields to search into when doing a "search in all"
@@ -464,7 +464,7 @@ $massactionbutton = $form->selectMassAction('', $arrayofmassactions);
 
 $head = [];
 if ($mode == 'modulesetup') {
-	$linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1">'.img_picto($langs->trans("BackToModuleList"), 'back', 'class="pictofixedwidth"').'<span class="hideonsmartphone">'.$langs->trans("BackToModuleList").'</span></a>';
+	$linkback = '<a href="'.dolBuildUrl(DOL_URL_ROOT.'/admin/modules.php', ['restore_lastsearch_values' => 1]).'">'.img_picto($langs->trans("BackToModuleList"), 'back', 'class="pictofixedwidth"').'<span class="hideonsmartphone">'.$langs->trans("BackToModuleList").'</span></a>';
 	print load_fiche_titre($langs->trans("CronSetup"), $linkback, 'title_setup');
 
 	// Configuration header
@@ -617,12 +617,11 @@ $totalarray = array();
 $totalarray['nbfield'] = 0;
 $imaxinloop = ($limit ? min($num, $limit) : $num);
 
-
 if ($num > 0) {
 	// Loop on each job
 
 	while ($i < $imaxinloop) {
-		$obj = $db->fetch_object($result);
+		$obj = $db->fetch_object($resql);
 		if (empty($obj)) {
 			break;
 		}
