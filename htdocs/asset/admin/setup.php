@@ -24,6 +24,8 @@
  * \brief	Asset setup page.
  */
 
+// Load Dolibarr environment
+require '../../main.inc.php';
 /**
  * @var Conf $conf
  * @var DoliDB $db
@@ -31,9 +33,6 @@
  * @var Translate $langs
  * @var User $user
  */
-
-// Load Dolibarr environment
-require '../../main.inc.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/asset.lib.php';
 require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 
@@ -69,13 +68,13 @@ $arrayofparameters = array(
 );
 
 $error = 0;
-$setupnotempty = 0;
 
 $dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
 
 $moduledir = 'asset';
-$myTmpObjects = array();
-$myTmpObjects['asset'] = array('label' => 'Asset', 'includerefgeneration' => 1, 'includedocgeneration' => 0, 'class' => 'Asset');
+$myTmpObjects = [
+	'asset' => array('label' => 'Asset', 'includerefgeneration' => 1, 'includedocgeneration' => 0, 'class' => 'Asset')
+];
 
 $tmpobjectkey = GETPOST('object', 'aZ09');
 if ($tmpobjectkey && !array_key_exists($tmpobjectkey, $myTmpObjects)) {
@@ -210,8 +209,6 @@ foreach ($myTmpObjects as $myTmpObjectKey => $myTmpObjectArray) {
 		/*
 		 * Assets Numbering model
 		 */
-		$setupnotempty++;
-
 		print load_fiche_titre($langs->trans("AssetNumberingModules", $myTmpObjectKey), '', '');
 
 		print '<table class="noborder centpercent">';
@@ -321,7 +318,6 @@ foreach ($myTmpObjects as $myTmpObjectKey => $myTmpObjectArray) {
 		/*
 		 * Document templates generators
 		 */
-		$setupnotempty++;
 		$type = strtolower($myTmpObjectKey);
 
 		print load_fiche_titre($langs->trans("DocumentModules", $myTmpObjectKey), '', '');
@@ -478,7 +474,6 @@ if ($action == 'edit') {
 
 	foreach ($arrayofparameters as $constname => $val) {
 		if ($val['enabled'] == 1) {
-			$setupnotempty++;
 			print '<tr class="oddeven"><td>';
 			$tooltiphelp = (($langs->trans($constname . 'Tooltip') != $constname . 'Tooltip') ? $langs->trans($constname . 'Tooltip') : '');
 			print '<span id="helplink'.$constname.'" class="spanforparamtooltip">'.$form->textwithpicto($langs->trans($constname), $tooltiphelp, 1, 'info', '', 0, 3, 'tootips'.$constname).'</span>';
@@ -593,7 +588,6 @@ if ($action == 'edit') {
 
 		foreach ($arrayofparameters as $constname => $val) {
 			if ($val['enabled'] == 1) {
-				$setupnotempty++;
 				print '<tr class="oddeven"><td>';
 				$tooltiphelp = (($langs->trans($constname . 'Tooltip') != $constname . 'Tooltip') ? $langs->trans($constname . 'Tooltip') : '');
 				print $form->textwithpicto($langs->trans($constname), $tooltiphelp);
@@ -622,7 +616,7 @@ if ($action == 'edit') {
 					if ($result < 0) {
 						setEventMessages(null, $c->errors, 'errors');
 					} elseif ($result > 0) {
-						$ways = $c->print_all_ways(' &gt;&gt; ', 'none', 0, 1); // $ways[0] = "ccc2 >> ccc2a >> ccc2a1" with html formatted text
+						$ways = $c->print_all_ways('auto', 'none', 0, 1); // $ways[0] = "ccc2 >> ccc2a >> ccc2a1" with html formatted text
 						$toprint = array();
 						foreach ($ways as $way) {
 							$toprint[] = '<li class="select2-search-choice-dolibarr noborderoncategories"' . ($c->color ? ' style="background: #' . $c->color . ';"' : ' style="background: #bbb"') . '>' . $way . '</li>';
@@ -645,7 +639,7 @@ if ($action == 'edit') {
 					if ($resprod > 0) {
 						print $product->ref;
 					} elseif ($resprod < 0) {
-						setEventMessages(null, $object->errors, "errors");
+						setEventMessages(null, $product->errors, "errors");
 					}
 				} elseif ($val['type'] == 'accountancy_code') {
 					if (isModEnabled('accounting')) {
@@ -674,9 +668,6 @@ if ($action == 'edit') {
 	}
 }
 
-if (empty($setupnotempty)) {
-	print '<br>'.$langs->trans("NothingToSetup");
-}
 
 // Page end
 print dol_get_fiche_end();

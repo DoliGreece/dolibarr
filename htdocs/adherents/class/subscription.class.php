@@ -1,7 +1,7 @@
 <?php
 /* Copyright (C) 2002-2004  Rodolphe Quiedeville    <rodolphe@quiedeville.org>
  * Copyright (C) 2006-2015  Laurent Destailleur     <eldy@users.sourceforge.net>
- * Copyright (C) 2024-2025	MDW						<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2024-2026	MDW						<mdeweerd@users.noreply.github.com>
  * Copyright (C) 2024-2025  Frédéric France         <frederic.france@free.fr>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -98,7 +98,7 @@ class Subscription extends CommonObject
 	public $fk_bank;
 
 	/**
-	 * @var array<string,array{type:string,label:string,enabled:int<0,2>|string,position:int,notnull?:int,visible:int<-6,6>|string,alwayseditable?:int<0,1>,noteditable?:int<0,1>,default?:string,index?:int,foreignkey?:string,searchall?:int<0,1>,isameasure?:int<0,1>,css?:string,csslist?:string,help?:string,showoncombobox?:int<0,4>,disabled?:int<0,1>,arrayofkeyval?:array<int|string,string>,autofocusoncreate?:int<0,1>,comment?:string,copytoclipboard?:int<1,2>,validate?:int<0,1>,showonheader?:int<0,1>}>  Array with all fields and their property. Do not use it as a static var. It may be modified by constructor.
+	 * @var array<string,array{type:string,label:string,enabled:int<0,2>|string,position:int,visible:int<-6,6>|string,langfile?:string,notnull?:int<-1,1>,noteditable?:int<0,1>,alwayseditable?:int<0,1>|string,default?:string|int,index?:int<0,1>,foreignkey?:string,searchall?:int<0,1>,isameasure?:int<0,1>,css?:string,cssview?:string,csslist?:string,help?:string,helplist?:string,showoncombobox?:int<0,4>|string,disabled?:int<0,1>|string,arrayofkeyval?:array<int|string,string>,autofocusoncreate?:int<0,1>,comment?:string,copytoclipboard?:int<1,2>,validate?:int<0,1>|string,showonheader?:int<0,1>,searchmulti?:int<0,1>,picto?:string,required?:int<0,1>,placeholder?:string}>  Array with all fields and their property. Do not use it as a static var. It may be modified by constructor.
 	 */
 	public $fields = array(
 		'rowid' => array('type' => 'integer', 'label' => 'TechnicalID', 'enabled' => 1, 'visible' => -1, 'notnull' => 1, 'position' => 10),
@@ -113,6 +113,7 @@ class Subscription extends CommonObject
 		'fk_type' => array('type' => 'integer', 'label' => 'MemberType', 'enabled' => 1, 'visible' => -1, 'position' => 55),
 		'fk_user_creat' => array('type' => 'integer:User:user/class/user.class.php', 'label' => 'UserAuthor', 'enabled' => 1, 'visible' => -2, 'position' => 60),
 		'fk_user_valid' => array('type' => 'integer:User:user/class/user.class.php', 'label' => 'UserValidation', 'enabled' => 1, 'visible' => -1, 'position' => 65),
+		'import_key' => array('type' => 'varchar(14)', 'label' => 'ImportId', 'enabled' => 1, 'visible' => -2, 'position' => 805),
 	);
 
 
@@ -144,6 +145,11 @@ class Subscription extends CommonObject
 
 		$now = dol_now();
 
+		// Clean parameters
+		if (isset($this->import_key)) {
+			$this->import_key = trim($this->import_key);
+		}
+
 		// Check parameters
 		if ($this->datef <= $this->dateh) {
 			$this->error = $langs->trans("ErrorBadValueForDate");
@@ -165,7 +171,7 @@ class Subscription extends CommonObject
 			$type = $this->fk_type;
 		}
 
-		$sql = "INSERT INTO ".MAIN_DB_PREFIX."subscription (fk_adherent, fk_type, datec, dateadh, datef, subscription, note, note_private, ref_ext, fk_user_creat)";
+		$sql = "INSERT INTO ".MAIN_DB_PREFIX."subscription (fk_adherent, fk_type, datec, dateadh, datef, subscription, note, note_private, ref_ext, fk_user_creat, import_key)";
 		$sql .= " VALUES (".((int) $this->fk_adherent).", '".$this->db->escape((string) $type)."', '".$this->db->idate($now)."',";
 		$sql .= " '".$this->db->idate($this->dateh)."',";
 		$sql .= " '".$this->db->idate($this->datef)."',";
@@ -174,6 +180,7 @@ class Subscription extends CommonObject
 		$sql .= " '".$this->db->escape($this->note_private)."',";
 		$sql .= " ".(empty($this->ref_ext) ? "null" : "'".$this->db->escape($this->ref_ext)."'").",";
 		$sql .= " ".((int) ($this->user_creation_id > 0 ? $this->user_creation_id : $user->id));
+		$sql .= ", ".(!empty($this->import_key) ? "'".$this->db->escape($this->import_key)."'" : "null");
 		$sql .= ")";
 
 		$resql = $this->db->query($sql);
@@ -424,7 +431,7 @@ class Subscription extends CommonObject
 	 *	@param	string	$option						Page for link ('', 'nolink', ...)
 	 *  @param  string  $morecss        			Add more css on link
 	 *  @param  int     $save_lastsearch_value    	-1=Auto, 0=No save of lastsearch_values when clicking, 1=Save lastsearch_values whenclicking
-	 *	@return	string								Chaine avec URL
+	 *	@return	string								String with URL
 	 */
 	public function getNomUrl($withpicto = 0, $notooltip = 0, $option = '', $morecss = '', $save_lastsearch_value = -1)
 	{
@@ -433,12 +440,14 @@ class Subscription extends CommonObject
 		$result = '';
 
 		$langs->load("members");
+		$langs->load("main");
 
 		$label = img_picto('', $this->picto).' <u class="paddingrightonly">'.$langs->trans("Subscription").'</u>';
 		/*if (isset($this->statut)) {
 			$label .= ' '.$this->getLibStatut(5);
 		}*/
 		$label .= '<br><b>'.$langs->trans('Ref').':</b> '.$this->ref;
+		$label .= '<br><b>'.$langs->trans('Label').':</b> '.$this->note_public;
 		if (!empty($this->dateh)) {
 			$label .= '<br><b>'.$langs->trans('DateStart').':</b> '.dol_print_date($this->dateh, 'day');
 		}

@@ -69,7 +69,7 @@ class Contact extends CommonObject
 
 	/**
 	 *  'type' if the field format ('integer', 'integer:ObjectClass:PathToClass[:AddCreateButtonOrNot[:Filter]]', 'varchar(x)', 'double(24,8)', 'real', 'price', 'text', 'html', 'date', 'datetime', 'timestamp', 'duration', 'mail', 'phone', 'url', 'password')
-	 *         Note: Filter can be a string like "(t.ref:like:'SO-%') or (t.date_creation:<:'20160101') or (t.nature:is:NULL)"
+	 *         Note: Filter can be a string like "(t.ref:like:'SO-%') or (t.date_creation:>:'20160101') or (t.nature:is:NULL)"
 	 *  'label' the translation key.
 	 *  'enabled' is a condition when the field must be managed.
 	 *  'position' is the sort order of field.
@@ -1531,7 +1531,7 @@ class Contact extends CommonObject
 	 *  Return name of contact with link (and eventually picto)
 	 *	Use $this->id, $this->lastname, $this->firstname, this->civility_id
 	 *
-	 *	@param		int			$withpicto					Include picto with link (0=no picto, 1=picto + name, 2=picto only, -1=photo+name, -2=photo only)
+	 *	@param		int			$withpicto					Include picto with link (0=no picto, 1=picto + name, 2=picto only, -1=photo+name, -2=photo only, -3=picto small + name)
 	 *	@param		string		$option						Where the link point to ('nolink', ...)
 	 *	@param		int			$notooltip					1=Disable tooltip
 	 *  @param		string		$moreparam					Add more param into URL
@@ -1827,17 +1827,18 @@ class Contact extends CommonObject
 	/**
 	 * Sets object to supplied categories.
 	 *
-	 * Deletes object from existing categories not supplied.
-	 * Adds it to non existing supplied categories.
-	 * Existing categories are left untouch.
+	 * Assign the object to all categories not yet assigned.
+	 * Unasign object from existing categories not supplied in $categories (if remove_existing==true).
+	 * If remove_existing is false, existing categories are left untouch.
 	 *
-	 * @param 	int[]|int 	$categories 	Category or categories IDs
-	 * @return 	int							Return integer <0 if KO, >0 if OK
+	 * @param 	int[]|int 	$categories 		Category or categories IDs
+	 * @param 	boolean		$remove_existing 	True: Remove existings categories from Object if not supplies by $categories, False: let them
+	 * @return 	int								Return integer <0 if KO, >0 if OK
 	 */
-	public function setCategories($categories)
+	public function setCategories($categories, $remove_existing = true)
 	{
 		require_once DOL_DOCUMENT_ROOT.'/categories/class/categorie.class.php';
-		return parent::setCategoriesCommon($categories, Categorie::TYPE_CONTACT);
+		return parent::setCategoriesCommon($categories, Categorie::TYPE_CONTACT, $remove_existing);
 	}
 
 	/**

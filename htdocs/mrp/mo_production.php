@@ -5,6 +5,7 @@
  * Copyright (C) 2024-2025  Frédéric France             <frederic.france@free.fr>
  * Copyright (C) 2024-2025	MDW							<mdeweerd@users.noreply.github.com>
  * Copyright (C) 2024		Alexandre Spangaro			<alexandre@inovea-conseil.com>
+ * Copyright (C) 2025		Noé Cendrier		 <noe.cendrier@altairis.fr>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -59,7 +60,7 @@ $id = GETPOSTINT('id');
 $ref = GETPOST('ref', 'alpha');
 $action = GETPOST('action', 'aZ09');
 $confirm = GETPOST('confirm', 'alpha');
-$cancel = GETPOST('cancel', 'aZ09');
+$cancel = GETPOST('cancel');
 $contextpage = GETPOST('contextpage', 'aZ') ? GETPOST('contextpage', 'aZ') : 'mocard'; // To manage different context of search
 $backtopage = GETPOST('backtopage', 'alpha');
 $lineid = GETPOSTINT('lineid');
@@ -160,6 +161,46 @@ if (empty($reshook)) {
 			$action = '';
 			setEventMessages($object->error, $object->errors, 'errors');
 		}
+	}
+
+	// Allow editing qty while MO is still in draft status.
+	// IMPORTANT: this handler MUST run BEFORE actions_addupdatedelete.inc.php,
+	// which has a generic 'set<key>' matcher that would intercept 'setqty' and
+	// call $object->fetch() + update() without setting $object->oldQty, so
+	// Mo::updateProduction() would skip the line scaling (its condition is
+	// !empty($this->oldQty)).
+	if ($action == 'setqty' && $permissiontoadd && $object->status == Mo::STATUS_DRAFT) {
+		$newqty = GETPOSTFLOAT('qty');
+		if ($newqty > 0) {
+			$object->oldQty = (float) $object->qty;
+			$object->qty = $newqty;
+			$res = $object->update($user);
+			if ($res > 0) {
+				// Enforce invariant: the 'toproduce' line for the MO's main product
+				// must equal the MO qty. Mo::updateProduction() scales by ratio
+				// (newQty/oldQty) which can drift if the line state was already
+				// inconsistent (e.g. legacy data from before this patch). Realign
+				// the main product line, leaving sub-products and frozen lines
+				// untouched.
+				$object->fetchLines();
+				foreach ($object->lines as $line) {
+					if ($line->role === 'toproduce'
+						&& (int) $line->fk_product === (int) $object->fk_product
+						&& empty($line->qty_frozen)
+						&& (float) $line->qty != (float) $object->qty) {
+						$line->qty = (float) $object->qty;
+						$line->update($user);
+					}
+				}
+				setEventMessages($langs->trans("RecordSaved"), null, 'mesgs');
+			} else {
+				setEventMessages($object->error, $object->errors, 'errors');
+			}
+		} else {
+			setEventMessages($langs->trans("ErrorFieldRequired", $langs->trans("Qty")), null, 'errors');
+		}
+		header("Location: ".$_SERVER["PHP_SELF"]."?id=".$object->id);
+		exit;
 	}
 
 	// Actions cancel, add, update, delete or clone
@@ -279,12 +320,12 @@ if (empty($reshook)) {
 						if (GETPOSTISSET('idwarehouse-'.$line->id.'-'.$i)) {	// If there is a warehouse to set
 							if (!(GETPOST('idwarehouse-'.$line->id.'-'.$i) > 0)) {	// If there is no warehouse set.
 								$langs->load("errors");
-								setEventMessages($langs->trans("ErrorFieldRequiredForProduct", $langs->transnoentitiesnoconv("Warehouse"), $tmpproduct->ref), null, 'errors');
+								setEventMessages($langs->trans("ErrorFieldRequiredForProduct", $langs->transnoentitiesnoconv("Warehouse"), (string) $tmpproduct->ref), null, 'errors');
 								$error++;
 							}
 							if ($tmpproduct->status_batch && (!GETPOST('batch-'.$line->id.'-'.$i))) {
 								$langs->load("errors");
-								setEventMessages($langs->trans("ErrorFieldRequiredForProduct", $langs->transnoentitiesnoconv("Batch"), $tmpproduct->ref), null, 'errors');
+								setEventMessages($langs->trans("ErrorFieldRequiredForProduct", $langs->transnoentitiesnoconv("Batch"), (string) $tmpproduct->ref), null, 'errors');
 								$error++;
 							}
 						}
@@ -390,7 +431,7 @@ if (empty($reshook)) {
 							$moline->batch = GETPOST('batchtoproduce-'.$line->id.'-'.$i);
 							$moline->role = 'produced';
 							$moline->fk_mrp_production = $line->id;
-							$moline->fk_stock_movement = $idstockmove;
+							$moline->fk_stock_movement = (($idstockmove == 0) ? null : $idstockmove);
 							$moline->fk_user_creat = $user->id;
 
 							$resultmoline = $moline->create($user);
@@ -713,6 +754,18 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	$keyforbreak = 'fk_warehouse';
 	unset($object->fields['fk_project']);
 	unset($object->fields['fk_soc']);
+	// Allow inline edit of qty while MO is in draft status.
+	// Note: editfieldval() does not handle type 'real' (no <input> rendered, only
+	// Save/Cancel buttons appear). So we override the type to 'numeric' only when
+	// the user has actually clicked the edit pencil (action=editqty). This keeps
+	// the read-mode rendering (price() format) untouched.
+	if ($object->status == Mo::STATUS_DRAFT && $permissiontoadd && isset($object->fields['qty'])) {
+		$object->fields['qty']['alwayseditable'] = 1;
+		if ($action == 'editqty') {
+			$object->fields['qty']['type'] = 'numeric';
+		}
+	}
+
 	include DOL_DOCUMENT_ROOT.'/core/tpl/commonfields_view.tpl.php';
 
 	// Other attributes
@@ -803,6 +856,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	}
 
 	if (in_array($action, array('consumeorproduce', 'consumeandproduceall', 'addconsumeline', 'addproduceline', 'editline'))) {
+		print '<!-- Form to enter value for consumption/production -->';
 		print '<form method="POST" action="'.dolBuildUrl($_SERVER["PHP_SELF"]).'">';
 		print '<input type="hidden" name="token" value="'.newToken().'">';
 		print '<input type="hidden" name="action" value="confirm_'.$action.'">';
@@ -815,14 +869,19 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			$defaultstockmovementcode = GETPOST('inventorycode', 'alphanohtml') ? GETPOST('inventorycode', 'alphanohtml') : dol_print_date(dol_now(), 'dayhourlog');
 
 			print '<div class="center'.(in_array($action, array('consumeorproduce', 'consumeandproduceall')) ? ' formconsumeproduce' : '').'">';
-			print '<div class="opacitymedium hideonsmartphone paddingbottom">'.$langs->trans("ConfirmProductionDesc", $langs->transnoentitiesnoconv("Confirm")).'<br></div>';
-			print '<span class="fieldrequired">'.$langs->trans("InventoryCode").':</span> <input type="text" class="minwidth150 maxwidth200" name="inventorycode" value="'.$defaultstockmovementcode.'"> &nbsp; ';
+			print '<div class="opacitymedium hideonsmartphone paddingbottom marginbottomonly">'.$langs->trans("ConfirmProductionDesc", $langs->transnoentitiesnoconv("Confirm")).'<br></div>';
+			print '<span class="paddingright">'.$langs->trans("InventoryCode").':</span>';
 			print '<span class="clearbothonsmartphone"></span>';
-			print $langs->trans("MovementLabel").': <input type="text" class="minwidth300" name="inventorylabel" value="'.$defaultstockmovementlabel.'"><br><br>';
+			print '<input type="text" class="minwidth125 maxwidth150" name="inventorycode" value="'.$defaultstockmovementcode.'">';
+			print '<span class="hideonsmartphone">&nbsp; &nbsp;</span>';
+			print '<span class="clearbothonsmartphone"></span>';
+			print '<span class="paddingright">'.$langs->trans("MovementLabel").':</span>';
+			print '<span class="clearbothonsmartphone"></span>';
+			print '<input type="text" class="minwidth300" name="inventorylabel" value="'.$defaultstockmovementlabel.'"><br><br>';
 			print '<input type="checkbox" id="autoclose" name="autoclose" value="1"'.(GETPOSTISSET('inventorylabel') ? (GETPOST('autoclose') ? ' checked="checked"' : '') : ' checked="checked"').'> <label for="autoclose">'.$langs->trans("AutoCloseMO").'</label><br>';
-			print '<input type="submit" class="button" value="'.$langs->trans("Confirm").'" name="confirm">';
+			print '<input type="submit" class="button margintoponly" value="'.$langs->trans("Confirm").'" name="confirm">';
 			print ' &nbsp; ';
-			print '<input class="button button-cancel" type="submit" value="'.$langs->trans("Cancel").'" name="cancel">';
+			print '<input class="button margintoponly button-cancel" type="submit" value="'.$langs->trans("Cancel").'" name="cancel">';
 			print '<br><br>';
 			print '</div>';
 
@@ -1298,8 +1357,8 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 							print '</td>';
 						}
 
-						// Action delete line
-						if ($permissiontodelete) {
+						// Action delete line, if no consumption has occurred for this product
+						if ($permissiontodelete && empty($arrayoflines)) {
 							$href = $_SERVER["PHP_SELF"] . '?id=' . ((int) $object->id) . '&action=deleteline&token=' . newToken() . '&lineid=' . ((int) $line->id);
 							print '<td class="center">';
 							print '<a class="reposition" href="' . $href . '">';

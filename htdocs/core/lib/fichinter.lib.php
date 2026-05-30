@@ -31,7 +31,7 @@
 /**
  * Prepare array with list of tabs
  *
- * @param   CommonObject	$object		Object related to tabs
+ * @param   Fichinter	$object		Object related to tabs
  * @return	array<array{0:string,1:string,2:string}>	Array of tabs to show
  */
 function fichinter_prepare_head($object)
@@ -50,7 +50,7 @@ function fichinter_prepare_head($object)
 	if (!getDolGlobalString('MAIN_DISABLE_CONTACTS_TAB')) {
 		$nbContact = count($object->liste_contact(-1, 'internal')) + count($object->liste_contact(-1, 'external'));
 		$head[$h][0] = dolBuildUrl(DOL_URL_ROOT.'/fichinter/contact.php', ['id' => $object->id]);
-		$head[$h][1] = $langs->trans('InterventionContact');
+		$head[$h][1] = $langs->trans('ContactsAddresses');
 		if ($nbContact > 0) {
 			$head[$h][1] .= '<span class="badge marginleftonlyshort">'.$nbContact.'</span>';
 		}
@@ -221,7 +221,7 @@ function fichinter_admin_prepare_head()
 /**
  * Prepare array with list of tabs
  *
- * @param   Object  $object     Object related to tabs
+ * @param   FichinterRec  $object     Object related to tabs
  * @return	array<array{0:string,1:string,2:string}>	Array of tabs to show
  */
 function fichinter_rec_prepare_head($object)

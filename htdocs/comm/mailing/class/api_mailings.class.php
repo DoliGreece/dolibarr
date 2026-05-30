@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025		Cloned from htdocs/comm/propal/class/api_proposals.class.php then modified
  * Copyright (C) 2025		Jon Bendtsen <jon.bendtsen.github@jonb.dk>
+ * Copyright (C) 2025       Frédéric France         <frederic.france@free.fr>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -465,7 +466,7 @@ class Mailings extends DolibarrApi
 			}
 			if ($field == 'array_options' && is_array($value)) {
 				foreach ($value as $index => $val) {
-					$this->mailing->array_options[$index] = $this->_checkValForAPI($field, $val, $this->mailing);
+					$this->mailing->array_options[$index] = $this->_checkValExtrafieldsForAPI($index, $val, $this->mailing);
 				}
 				continue;
 			}
@@ -1147,9 +1148,12 @@ class Mailings extends DolibarrApi
 	// phpcs:disable PEAR.NamingConventions.ValidFunctionName.PublicUnderscore
 	/**
 	 * Clean sensible object datas
+	 * @phpstan-template T
 	 *
 	 * @param   Object  $object     Object to clean
 	 * @return  Object              Object with cleaned properties
+	 * @phpstan-param T $object
+	 * @phpstan-return T
 	 */
 	protected function _cleanObjectDatas($object)
 	{

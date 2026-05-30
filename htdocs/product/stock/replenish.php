@@ -7,7 +7,8 @@
  * Copyright (C) 2019-2025  Frédéric France     <frederic.france@free.fr>
  * Copyright (C) 2021		Ferran Marcet		<fmarcet@2byte.es>
  * Copyright (C) 2021		Antonin MARCHAL		<antonin@letempledujeu.fr>
- * Copyright (C) 2024-2025	MDW					<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2024-2026	MDW					<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2025		Josep Lluís Amador	<joseplluis@lliuretic.cat>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,13 +32,6 @@
 
 // Load Dolibarr environment
 require '../../main.inc.php';
-require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
-require_once DOL_DOCUMENT_ROOT . '/core/class/html.formother.class.php';
-require_once DOL_DOCUMENT_ROOT . '/core/class/html.form.class.php';
-require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.commande.class.php';
-require_once DOL_DOCUMENT_ROOT . '/product/class/html.formproduct.class.php';
-require_once './lib/replenishment.lib.php';
-
 /**
  * @var Conf $conf
  * @var DoliDB $db
@@ -45,6 +39,12 @@ require_once './lib/replenishment.lib.php';
  * @var Translate $langs
  * @var User $user
  */
+require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
+require_once DOL_DOCUMENT_ROOT . '/core/class/html.formother.class.php';
+require_once DOL_DOCUMENT_ROOT . '/core/class/html.form.class.php';
+require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.commande.class.php';
+require_once DOL_DOCUMENT_ROOT . '/product/class/html.formproduct.class.php';
+require_once './lib/replenishment.lib.php';
 
 // Load translation files required by the page
 $langs->loadLangs(array('products', 'stocks', 'orders'));
@@ -66,7 +66,7 @@ $search_ref = GETPOST('search_ref', 'alpha');
 $search_label = GETPOST('search_label', 'alpha');
 $sall = trim(GETPOST('search_all', 'alphanohtml'));
 $type = GETPOSTINT('type');
-$tobuy = GETPOSTINT('tobuy');
+$tobuy = GETPOSTFLOAT('tobuy');
 $salert = GETPOST('salert', 'alpha');
 $includeproductswithoutdesiredqty = GETPOST('includeproductswithoutdesiredqty', 'alpha');
 $mode = GETPOST('mode', 'alpha');
@@ -184,7 +184,7 @@ if ($action == 'order' && GETPOST('valid') && $user->hasRight('fournisseur', 'co
 				$box = $i;
 				$supplierpriceid = GETPOSTINT('fourn'.$i);
 				//get all the parameters needed to create a line
-				$qty = GETPOSTINT('tobuy'.$i);
+				$qty = GETPOSTFLOAT('tobuy'.$i);
 				$idprod = $productsupplier->get_buyprice($supplierpriceid, $qty);
 				$res = $productsupplier->fetch($idprod);
 				if ($res && $idprod > 0) {
@@ -250,6 +250,7 @@ if ($action == 'order' && GETPOST('valid') && $user->hasRight('fournisseur', 'co
 		//we now know how many orders we need and what lines they have
 		$i = 0;
 		$fail = 0;
+		$id = 0;
 		$orders = array();
 		$suppliersid = array_keys($suppliers);	// array of ids of suppliers
 		foreach ($suppliers as $supplier) {
@@ -363,10 +364,10 @@ $prod = new Product($db);
 $title = $langs->trans('MissingStocks');
 
 if (getDolGlobalString('STOCK_ALLOW_ADD_LIMIT_STOCK_BY_WAREHOUSE') && $fk_entrepot > 0) {
-	$sqldesiredtock = $db->ifsql("pse.desiredstock IS NULL", "p.desiredstock", "pse.desiredstock");
+	$sqldesiredstock = $db->ifsql("pse.desiredstock IS NULL", "p.desiredstock", "pse.desiredstock");
 	$sqlalertstock = $db->ifsql("pse.seuil_stock_alerte IS NULL", "p.seuil_stock_alerte", "pse.seuil_stock_alerte");
 } else {
-	$sqldesiredtock = 'p.desiredstock';
+	$sqldesiredstock = 'p.desiredstock';
 	$sqlalertstock = 'p.seuil_stock_alerte';
 }
 
@@ -377,7 +378,7 @@ $sql .= ' p.desiredstock, p.seuil_stock_alerte,';
 if (getDolGlobalString('STOCK_ALLOW_ADD_LIMIT_STOCK_BY_WAREHOUSE') && $fk_entrepot > 0) {
 	$sql .= ' pse.desiredstock as desiredstockpse, pse.seuil_stock_alerte as seuil_stock_alertepse,';
 }
-$sql .= " " . $sqldesiredtock . " as desiredstockcombined, " . $sqlalertstock . " as seuil_stock_alertecombined,";
+$sql .= " " . $sqldesiredstock . " as desiredstockcombined, " . $sqlalertstock . " as seuil_stock_alertecombined,";
 $sql .= ' s.fk_product,';
 $sql .= " SUM(".$db->ifsql("s.reel IS NULL", "0", "s.reel").') as stock_physique';
 if (getDolGlobalString('STOCK_ALLOW_ADD_LIMIT_STOCK_BY_WAREHOUSE') && $fk_entrepot > 0) {
@@ -516,16 +517,23 @@ if ($usevirtualstock) {
 		$sqlProductionToProduce = '0';
 	}
 
+	$parameters = array();
+	$sqlHookVirtualStock = "0";
+	$reshook = $hookmanager->executeHooks('printFieldListHavingVirtualStock', $parameters); // Note that $action and $object may have been modified by hook
+	if (!empty($hookmanager->resPrint)) {
+		$sqlHookVirtualStock = $hookmanager->resPrint;
+	}
+
 	$sql .= ' HAVING (';
-	$sql .= " (" . $sqldesiredtock . " >= 0 AND (" . $sqldesiredtock . " > SUM(" . $db->ifsql("s.reel IS NULL", "0", "s.reel") . ')';
-	$sql .= " - (" . $sqlCommandesCli . " - " . $sqlExpeditionsCli . ") + (" . $sqlCommandesFourn . " - " . $sqlReceptionFourn . ") + (" . $sqlProductionToProduce . " - " . $sqlProductionToConsume . ")))";
+	$sql .= " (" . $sqldesiredstock . " >= 0 AND (" . $sqldesiredstock . " > SUM(" . $db->ifsql("s.reel IS NULL", "0", "s.reel") . ')';
+	$sql .= " - (" . $sqlCommandesCli . " - " . $sqlExpeditionsCli . ") + (" . $sqlCommandesFourn . " - " . $sqlReceptionFourn . ") + (" . $sqlProductionToProduce . " - " . $sqlProductionToConsume . ") + ".$sqlHookVirtualStock."))";
 	$sql .= ' OR';
 	if ($includeproductswithoutdesiredqty == 'on') {
 		$sql .= " ((" . $sqlalertstock . " >= 0 OR " . $sqlalertstock . " IS NULL) AND (" . $db->ifsql($sqlalertstock . " IS NULL", "0", $sqlalertstock) . " > SUM(" . $db->ifsql("s.reel IS NULL", "0", "s.reel") . ")";
 	} else {
 		$sql .= " (" . $sqlalertstock . " >= 0 AND (" . $sqlalertstock . " > SUM(" . $db->ifsql("s.reel IS NULL", "0", "s.reel") . ')';
 	}
-	$sql .= " - (" . $sqlCommandesCli . " - " . $sqlExpeditionsCli . ") + (" . $sqlCommandesFourn . " - " . $sqlReceptionFourn . ") + (" . $sqlProductionToProduce . " - " . $sqlProductionToConsume . ")))";
+	$sql .= " - (" . $sqlCommandesCli . " - " . $sqlExpeditionsCli . ") + (" . $sqlCommandesFourn . " - " . $sqlReceptionFourn . ") + (" . $sqlProductionToProduce . " - " . $sqlProductionToConsume . ") + ".$sqlHookVirtualStock."))";
 	$sql .= ")";
 	if (getDolGlobalString('STOCK_ALLOW_ADD_LIMIT_STOCK_BY_WAREHOUSE') && $fk_entrepot > 0) {
 		$sql .= " AND (";
@@ -539,13 +547,13 @@ if ($usevirtualstock) {
 		} else {
 			$sql .= $sqlalertstock . " >= 0 AND (" . $sqlalertstock . " > SUM(" . $db->ifsql("s.reel IS NULL", "0", "s.reel") . ")";
 		}
-		$sql .= " - (" . $sqlCommandesCli . " - " . $sqlExpeditionsCli . ") + (" . $sqlCommandesFourn . " - " . $sqlReceptionFourn . ")  + (" . $sqlProductionToProduce . " - " . $sqlProductionToConsume . "))";
+		$sql .= " - (" . $sqlCommandesCli . " - " . $sqlExpeditionsCli . ") + (" . $sqlCommandesFourn . " - " . $sqlReceptionFourn . ")  + (" . $sqlProductionToProduce . " - " . $sqlProductionToConsume . ") + ".$sqlHookVirtualStock.")";
 		$sql .= ")";
 		$alertchecked = 'checked';
 	}
 } else {
 	$sql .= ' HAVING (';
-	$sql .= "(" . $sqldesiredtock . " >= 0 AND (" . $sqldesiredtock . " > SUM(" . $db->ifsql("s.reel IS NULL", "0", "s.reel") . ")))";
+	$sql .= "(" . $sqldesiredstock . " >= 0 AND (" . $sqldesiredstock . " > SUM(" . $db->ifsql("s.reel IS NULL", "0", "s.reel") . ")))";
 	$sql .= ' OR';
 	if ($includeproductswithoutdesiredqty == 'on') {
 		$sql .= " ((" . $sqlalertstock . " >= 0 OR " . $sqlalertstock . " IS NULL) AND (" . $db->ifsql($sqlalertstock . " IS NULL", "0", $sqlalertstock) . " > SUM(" . $db->ifsql("s.reel IS NULL", "0", "s.reel") . ')))';
@@ -824,20 +832,20 @@ print '</tr>';
 // Lines of title
 print '<tr class="liste_titre">';
 print_liste_field_titre('<input type="checkbox" onClick="toggle(this)" />', $_SERVER["PHP_SELF"], '');
-print_liste_field_titre('ProductRef', $_SERVER["PHP_SELF"], 'p.ref', $param, '', '', $sortfield, $sortorder);
-print_liste_field_titre('Label', $_SERVER["PHP_SELF"], 'p.label', $param, '', '', $sortfield, $sortorder);
+print_liste_field_titre('ProductRef', $_SERVER["PHP_SELF"], 'p.ref', '', $param, '', $sortfield, $sortorder);
+print_liste_field_titre('Label', $_SERVER["PHP_SELF"], 'p.label', '', $param, '', $sortfield, $sortorder);
 if (isModEnabled("service") && $type == 1) {
-	print_liste_field_titre('Duration', $_SERVER["PHP_SELF"], 'p.duration', $param, '', '', $sortfield, $sortorder, 'center ');
+	print_liste_field_titre('Duration', $_SERVER["PHP_SELF"], 'p.duration', '', $param, '', $sortfield, $sortorder, 'center ');
 }
-print_liste_field_titre('DesiredStock', $_SERVER["PHP_SELF"], 'p.desiredstock', $param, '', '', $sortfield, $sortorder, 'right ');
-print_liste_field_titre('StockLimitShort', $_SERVER["PHP_SELF"], 'p.seuil_stock_alerte', $param, '', '', $sortfield, $sortorder, 'right ');
-print_liste_field_titre($stocklabel, $_SERVER["PHP_SELF"], 'stock_physique', $param, '', '', $sortfield, $sortorder, 'right ', $stocktooltip);
+print_liste_field_titre('DesiredStock', $_SERVER["PHP_SELF"], 'p.desiredstock', '', $param, '', $sortfield, $sortorder, 'right ');
+print_liste_field_titre('StockLimitShort', $_SERVER["PHP_SELF"], 'p.seuil_stock_alerte', '', $param, '', $sortfield, $sortorder, 'right ');
+print_liste_field_titre($stocklabel, $_SERVER["PHP_SELF"], 'stock_physique', '', $param, '', $sortfield, $sortorder, 'right ', $stocktooltip);
 if (getDolGlobalString('STOCK_ALLOW_ADD_LIMIT_STOCK_BY_WAREHOUSE') && $fk_entrepot > 0) {
-	print_liste_field_titre($stocklabelbis, $_SERVER["PHP_SELF"], 'stock_real_warehouse', $param, '', '', $sortfield, $sortorder, 'right ');
+	print_liste_field_titre($stocklabelbis, $_SERVER["PHP_SELF"], 'stock_real_warehouse', '', $param, '', $sortfield, $sortorder, 'right ');
 }
-print_liste_field_titre('Ordered', $_SERVER["PHP_SELF"], '', $param, '', '', $sortfield, $sortorder, 'right ');
-print_liste_field_titre('StockToBuy', $_SERVER["PHP_SELF"], '', $param, '', '', $sortfield, $sortorder, 'right ');
-print_liste_field_titre('SupplierRef', $_SERVER["PHP_SELF"], '', $param, '', '', $sortfield, $sortorder, 'right ');
+print_liste_field_titre('Ordered', $_SERVER["PHP_SELF"], '', '', $param, '', $sortfield, $sortorder, 'right ');
+print_liste_field_titre('StockToBuy', $_SERVER["PHP_SELF"], '', '', $param, '', $sortfield, $sortorder, 'right ');
+print_liste_field_titre('SupplierRef', $_SERVER["PHP_SELF"], '', '', $param, '', $sortfield, $sortorder, 'right ');
 
 // Hook fields
 $parameters = array('param' => $param, 'sortfield' => $sortfield, 'sortorder' => $sortorder);
@@ -982,7 +990,7 @@ while ($i < ($limit ? min($num, $limit) : $num)) {
 		print '<td class="right">'.((getDolGlobalString('STOCK_ALLOW_ADD_LIMIT_STOCK_BY_WAREHOUSE') && $fk_entrepot > 0) > 0 ? ($objp->seuil_stock_alertepse ? $alertstockwarehouse : img_info($langs->trans('ProductValuesUsedBecauseNoValuesForThisWarehouse')) . '0') : $alertstock).'</td>';
 
 		// Current stock (all warehouses)
-		print '<td class="right">' . $warning . $stock;
+		print '<td class="right">' . $warning . price(price2num($stock, 'MS'));
 		print '<!-- stock returned by main sql is ' . $objp->stock_physique . ' -->';
 		print '</td>';
 

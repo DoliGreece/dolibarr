@@ -30,14 +30,6 @@
 
 // Load Dolibarr environment
 require '../../main.inc.php';
-require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
-require_once DOL_DOCUMENT_ROOT.'/commande/class/commandestats.class.php';
-require_once DOL_DOCUMENT_ROOT.'/categories/class/categorie.class.php';
-require_once DOL_DOCUMENT_ROOT.'/core/class/html.formorder.class.php';
-require_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
-require_once DOL_DOCUMENT_ROOT.'/core/class/html.formother.class.php';
-require_once DOL_DOCUMENT_ROOT.'/core/class/dolgraph.class.php';
-
 /**
  * @var Conf $conf
  * @var DoliDB $db
@@ -45,6 +37,13 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/dolgraph.class.php';
  * @var Translate $langs
  * @var User $user
  */
+require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
+require_once DOL_DOCUMENT_ROOT.'/commande/class/commandestats.class.php';
+require_once DOL_DOCUMENT_ROOT.'/categories/class/categorie.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/class/html.formorder.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/class/html.formother.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/class/dolgraph.class.php';
 
 $WIDTH = DolGraph::getDefaultGraphSizeForStats('width');
 $HEIGHT = DolGraph::getDefaultGraphSizeForStats('height');
@@ -416,6 +415,7 @@ if (!in_array($nowyear, $arrayyears)) {
 	$arrayyears[$nowyear] = $nowyear;
 }
 arsort($arrayyears);
+print img_picto('', 'calendar', 'class="pictofixedwidth"');
 print $form->selectarray('year', $arrayyears, $year, 0, 0, 0, '', 0, 0, 0, '', 'width75');
 print '</td></tr>';
 print '<tr><td align="center" colspan="2"><input type="submit" class="button small" name="submit" value="'.$langs->trans("Refresh").'"></td></tr>';

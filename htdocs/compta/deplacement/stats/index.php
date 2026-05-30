@@ -65,8 +65,7 @@ if ($user->socid) {
 $result = restrictedArea($user, 'deplacement', $id, '');
 
 // Other security check
-$childids = $user->getAllChildIds();
-$childids[] = $user->id;
+$childids = $user->getAllChildIds(1);
 if ($userid > 0) {
 	if (!$user->hasRight('deplacement', 'readall') && !$user->hasRight('deplacement', 'lire_tous') && !in_array($userid, $childids)) {
 		accessforbidden();
@@ -273,6 +272,7 @@ if (!in_array($year, $arrayyears)) {
 	$arrayyears[$year] = $year;
 }
 arsort($arrayyears);
+print img_picto('', 'calendar', 'class="pictofixedwidth"');
 print $form->selectarray('year', $arrayyears, $year, 0, 0, 0, '', 0, 0, 0, '', 'width75');
 print '</td></tr>';
 print '<tr><td align="center" colspan="2"><input type="submit" name="submit" class="button small" value="'.$langs->trans("Refresh").'"></td></tr>';

@@ -11,7 +11,7 @@
  * Copyright (C) 2011		Philippe Grand			<philippe.grand@atoo-net.com>
  * Copyright (C) 2014		Teddy Andreotti			<125155@supinfo.com>
  * Copyright (C) 2024-2025	MDW						<mdeweerd@users.noreply.github.com>
- * Copyright (C) 2025       Frédéric France         <frederic.france@free.fr>
+ * Copyright (C) 2025-2026  Frédéric France         <frederic.france@free.fr>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -62,9 +62,12 @@ require_once 'filefunc.inc.php';
  * @var string $dolibarr_main_url_root
  * @var string $dolibarr_main_url_root_alt
  * @var string $dolibarr_main_document_root_alt
+ * @var string $dolibarr_allow_unsecured_select_in_extrafields_filter;
+ * @var string|string[] $dolibarr_main_stream_to_disable
  */
 '
 @phan-var-force ?string $dolibarr_main_db_prefix
+@phan-var-force ?string $dolibarr_main_db_collation
 @phan-var-force ?string $dolibarr_main_db_encryption
 @phan-var-force ?string $dolibarr_main_db_cryptkey
 @phan-var-force ?string $dolibarr_main_limit_users
@@ -72,6 +75,7 @@ require_once 'filefunc.inc.php';
 ';
 require_once DOL_DOCUMENT_ROOT.'/core/class/conf.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
+
 
 if (!function_exists('is_countable')) {
 	/**
@@ -88,6 +92,55 @@ if (!function_exists('is_countable')) {
 
 
 /*
+ * Define some constants
+ */
+
+if (!defined('EURO')) {
+	define('EURO', chr(128));
+}
+
+// Define syslog constants
+if (!defined('LOG_DEBUG')) {
+	if (!function_exists("syslog")) {
+		// For PHP versions without syslog (like running on Windows OS)
+		define('LOG_EMERG', 0);
+		define('LOG_ALERT', 1);
+		define('LOG_CRIT', 2);
+		define('LOG_ERR', 3);
+		define('LOG_WARNING', 4);
+		define('LOG_NOTICE', 5);
+		define('LOG_INFO', 6);
+		define('LOG_DEBUG', 7);
+	}
+}
+
+if (!defined('SUBTOTALS_SPECIAL_CODE')) {
+	define('SUBTOTALS_SPECIAL_CODE', 81);
+}
+
+
+/*
+ * Disable some not used PHP stream
+ */
+$listofwrappers = stream_get_wrappers();
+// We need '.phar' for geoip2. TODO Replace phar in geoip with exploded files so we can disable phar by default.
+// phar stream does not auto unserialize content (possible code execution) since PHP 8.1
+// zip stream is necessary by excel import module
+$arrayofstreamtodisable = array('compress.zlib', 'compress.bzip2', 'ftp', 'ftps', 'glob', 'data', 'expect', 'ogg', 'rar', 'zlib');
+if (!empty($dolibarr_main_stream_to_disable) && is_array($dolibarr_main_stream_to_disable)) {
+	$arrayofstreamtodisable = $dolibarr_main_stream_to_disable;
+}
+foreach ($arrayofstreamtodisable as $streamtodisable) {
+	if (!empty($listofwrappers) && in_array($streamtodisable, $listofwrappers)) {
+		/*if (!empty($dolibarr_main_stream_do_not_disable) && is_array($dolibarr_main_stream_do_not_disable) && in_array($streamtodisable, $dolibarr_main_stream_do_not_disable)) {
+			continue;	// We do not disable this stream
+		}*/
+		stream_wrapper_unregister($streamtodisable);
+	}
+}
+
+
+/*
  * Create $conf object
  */
 
@@ -99,7 +152,7 @@ $conf->db->port = empty($dolibarr_main_db_port) ? '' : $dolibarr_main_db_port;
 $conf->db->name = empty($dolibarr_main_db_name) ? '' : $dolibarr_main_db_name;
 $conf->db->user = empty($dolibarr_main_db_user) ? '' : $dolibarr_main_db_user;
 $conf->db->pass = empty($dolibarr_main_db_pass) ? '' : $dolibarr_main_db_pass;
-$conf->db->type = $dolibarr_main_db_type;
+$conf->db->type = empty($dolibarr_main_db_type) ? '' : $dolibarr_main_db_type;
 $conf->db->prefix = $dolibarr_main_db_prefix;
 $conf->db->character_set = $dolibarr_main_db_character_set;
 $conf->db->dolibarr_main_db_collation = $dolibarr_main_db_collation;
@@ -223,6 +276,13 @@ if (!defined('NOREQUIREUSER')) {
  */
 if (!defined('NOHOOKMANAGER')) {
 	$hookmanager = new HookManager($db);
+}
+/*
+ * Create $extrafields object
+ */
+if ($db !== null) {
+	require_once DOL_DOCUMENT_ROOT . '/core/class/extrafields.class.php';
+	$extrafields = new ExtraFields($db);
 }
 
 

@@ -6,8 +6,8 @@
  * Copyright (C) 2007		Franky Van Liedekerke	<franky.van.liedekerke@telenet.be>
  * Copyright (C) 2013       Florian Henry		  	<florian.henry@open-concept.pro>
  * Copyright (C) 2015	    Claudio Aschieri		<c.aschieri@19.coop>
- * Copyright (C) 2024-2025  Frédéric France			<frederic.france@free.fr>
- * Copyright (C) 2025		MDW						<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2024-2026  Frédéric France			<frederic.france@free.fr>
+ * Copyright (C) 2025-2026	MDW						<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,12 +31,19 @@
 
 // Load Dolibarr environment
 require '../main.inc.php';
+/**
+ * @var Conf $conf
+ * @var DoliDB $db
+ * @var ExtraFields $extrafields
+ * @var HookManager $hookmanager
+ * @var Translate $langs
+ * @var User $user
+ */
 require_once DOL_DOCUMENT_ROOT.'/delivery/class/delivery.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/modules/delivery/modules_delivery.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/sendings.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/doleditor.class.php';
-require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
 if (isModEnabled("product") || isModEnabled("service")) {
 	require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 }
@@ -50,14 +57,6 @@ if (isModEnabled('project')) {
 	require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
 	require_once DOL_DOCUMENT_ROOT.'/core/class/html.formprojet.class.php';
 }
-
-/**
- * @var Conf $conf
- * @var DoliDB $db
- * @var HookManager $hookmanager
- * @var Translate $langs
- * @var User $user
- */
 
 // Load translation files required by the page
 $langs->loadLangs(array('bills', 'orders', 'sendings'));
@@ -76,7 +75,6 @@ $id = GETPOSTINT('id');
 $hookmanager->initHooks(array('deliverycard', 'globalcard'));
 
 $object = new Delivery($db);
-$extrafields = new ExtraFields($db);
 
 // fetch optionals attributes and labels
 $extrafields->fetch_name_optionals_label($object->table_element);
@@ -104,12 +102,12 @@ $permissiondellink = $user->hasRight('expedition', 'delivery', 'creer'); // Used
 $permissiontoeditextra = $permissiontoadd;
 if (GETPOST('attribute', 'aZ09') && isset($extrafields->attributes[$object->table_element]['perms'][GETPOST('attribute', 'aZ09')])) {
 	// For action 'update_extras', is there a specific permission set for the attribute to update
-	$permissiontoeditextra = dol_eval($extrafields->attributes[$object->table_element]['perms'][GETPOST('attribute', 'aZ09')]);
+	$permissiontoeditextra = dol_eval((string) $extrafields->attributes[$object->table_element]['perms'][GETPOST('attribute', 'aZ09')]);
 }
 $permissiontoeditextraline = $permissiontoadd;
 if (GETPOST('attribute', 'aZ09') && isset($extrafields->attributes[$object->table_element_line]['perms'][GETPOST('attribute', 'aZ09')])) {
 	// For action 'update_extras', is there a specific permission set for the attribute to update
-	$permissiontoeditextraline = dol_eval($extrafields->attributes[$object->table_element_line]['perms'][GETPOST('attribute', 'aZ09')]);
+	$permissiontoeditextraline = dol_eval((string) $extrafields->attributes[$object->table_element_line]['perms'][GETPOST('attribute', 'aZ09')]);
 }
 
 
@@ -128,20 +126,17 @@ if ($action == 'add' && $permissiontoadd) {
 	$db->begin();
 
 	$object->date_delivery = dol_now();
-	$object->note          = GETPOST("note", 'restricthtml');
 	$object->note_private  = GETPOST("note", 'restricthtml');
+	$object->note          = $object->note_private;	// deprecated
 	$object->commande_id   = GETPOSTINT("commande_id");
 	$object->fk_incoterms  = GETPOSTINT('incoterm_id');
-
-	/* ->entrepot_id seems to not exists
-	if (!getDolGlobalInt('MAIN_SUBMODULE_EXPEDITION') && isModEnabled('stock')) {
-		$object->entrepot_id = GETPOST('entrepot_id', 'int');
-	}*/
+	// $object->entrepot_id = GETPOST('entrepot_id', 'int');	entrepot_id does not exists on delivery note, only on shipment document
 
 	// We loop on each line of order to complete object delivery with qty to delivery
 	$commande = new Commande($db);
 	$commande->fetch($object->commande_id);
 	$commande->fetch_lines();
+
 	$num = count($commande->lines);
 	for ($i = 0; $i < $num; $i++) {
 		$qty = "qtyl".$i;
@@ -302,6 +297,7 @@ llxHeader('', $title, 'Livraison', '', 0, 0, '', '', '', 'mod-delivery page-card
 
 $form = new Form($db);
 $formfile = new FormFile($db);
+$objectsrc = null;
 
 if ($action == 'create') {
 	// Create. Seems to no be used
@@ -374,7 +370,7 @@ if ($action == 'create') {
 			// Thirdparty
 			$morehtmlref .= '<br>'.$expedition->thirdparty->getNomUrl(1);
 			// Project
-			if (isModEnabled('project')) {
+			if (isModEnabled('project') && $objectsrc !== null) {
 				$langs->load("projects");
 				$morehtmlref .= '<br>';
 				if (0) {	// @phpstan-ignore-line  Do not change on shipment
@@ -602,7 +598,7 @@ if ($action == 'create') {
 
 						print '<td>';
 
-						// Affiche ligne produit
+						// Show product line
 						$text = '<a href="'.DOL_URL_ROOT.'/product/card.php?id='.$object->lines[$i]->fk_product.'">';
 						if ($object->lines[$i]->fk_product_type == 1) {
 							$text .= img_object($langs->trans('ShowService'), 'service');
@@ -688,17 +684,17 @@ if ($action == 'create') {
 				if ($object->statut == 0 && $num_prod > 0) {
 					if ((!getDolGlobalString('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('expedition', 'delivery', 'creer'))
 						|| (getDolGlobalString('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('expedition', 'delivery_advance', 'validate'))) {
-						print dolGetButtonAction('', $langs->trans('Validate'), 'default', $_SERVER["PHP_SELF"].'?action=valid&amp;token='.newToken().'&amp;id='.$object->id, '');
+						print dolGetButtonAction('', $langs->trans('Validate'), 'default', $_SERVER["PHP_SELF"].'?action=valid&token='.newToken().'&id='.$object->id, '');
 					}
 				}
 				if ($user->hasRight('expedition', 'delivery', 'supprimer') && $action != 'presend') {
 					if ($object->status == Delivery::STATUS_VALIDATED && $action != 'presend' && $expedition->status == Expedition::STATUS_VALIDATED) {
-						print dolGetButtonAction('', $langs->trans('SendMail'), 'default', $_SERVER["PHP_SELF"].'?action=presend&token='.newToken().'&id='.$object->id.'&mode=init#formmailbeforetitle', '');
+						print dolGetButtonAction('', $langs->trans('SendMail'), 'email', $_SERVER["PHP_SELF"].'?action=presend&token='.newToken().'&id='.$object->id.'&mode=init#formmailbeforetitle', '');
 					}
 					if (getDolGlobalInt('MAIN_SUBMODULE_EXPEDITION')) {
-						print dolGetButtonAction('', $langs->trans('Delete'), 'delete', $_SERVER["PHP_SELF"].'?id='.$object->id.'&amp;expid='.$object->origin_id.'&amp;action=delete&amp;token='.newToken().'&amp;backtopage='.urlencode(DOL_URL_ROOT.'/expedition/card.php?id='.$object->origin_id), '');
+						print dolGetButtonAction('', $langs->trans('Delete'), 'delete', $_SERVER["PHP_SELF"].'?id='.$object->id.'&expid='.$object->origin_id.'&action=delete&token='.newToken().'&backtopage='.urlencode(DOL_URL_ROOT.'/expedition/card.php?id='.$object->origin_id), '');
 					} else {
-						print dolGetButtonAction('', $langs->trans('Delete'), 'delete', $_SERVER["PHP_SELF"].'?action=delete&amp;token='.newToken().'&amp;id='.$object->id, '');
+						print dolGetButtonAction('', $langs->trans('Delete'), 'delete', $_SERVER["PHP_SELF"].'?action=delete&token='.newToken().'&id='.$object->id, '');
 					}
 				}
 
@@ -712,7 +708,7 @@ if ($action == 'create') {
 			  * Documents generated
 			 */
 			if ($action != 'presend') {
-				$objectref = dol_sanitizeFileName($object->ref);
+				$objectref = dol_sanitizeFileName((string) $object->ref);
 				$filedir = $conf->expedition->dir_output."/receipt/".$objectref;
 				$urlsource = $_SERVER["PHP_SELF"]."?id=".$object->id;
 
@@ -725,14 +721,14 @@ if ($action == 'create') {
 				  * Linked object block (of linked shipment)
 				  */
 
-					// Show links to link elements
-					print '</div><div class="fichehalfright">';
+				// Show links to link elements
+				print '</div><div class="fichehalfright">';
 
-					// List of actions on element
-					include_once DOL_DOCUMENT_ROOT.'/core/class/html.formactions.class.php';
+				// List of actions on element
+				include_once DOL_DOCUMENT_ROOT.'/core/class/html.formactions.class.php';
 
-					//$tmparray = $form->showLinkToObjectBlock($object, null, array('order'), 1);
-					$somethingshown = $form->showLinkedObjectBlock($object, '');
+				//$tmparray = $form->showLinkToObjectBlock($object, null, array('order'), 1);
+				$somethingshown = $form->showLinkedObjectBlock($object, '');
 			}
 
 

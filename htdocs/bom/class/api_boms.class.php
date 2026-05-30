@@ -1,7 +1,7 @@
 <?php
-/* Copyright (C) 2015   Jean-François Ferry     <jfefe@aternatik.fr>
+/* Copyright (C) 2015       Jean-François Ferry     <jfefe@aternatik.fr>
  * Copyright (C) 2019 Maxime Kohlhaas <maxime@atm-consulting.fr>
- * Copyright (C) 2020-2024  Frédéric France		<frederic.france@free.fr>
+ * Copyright (C) 2020-2025  Frédéric France		    <frederic.france@free.fr>
  * Copyright (C) 2022		Christian Humpel		<christian.humpel@live.com>
  * Copyright (C) 2025		MDW						<mdeweerd@users.noreply.github.com>
  *
@@ -97,7 +97,7 @@ class Boms extends DolibarrApi
 	 * @param string		   $sortorder			Sort order
 	 * @param int			   $limit				Limit for list
 	 * @param int			   $page				Page number
-	 * @param string           $sqlfilters          Other criteria to filter answers separated by a comma. Syntax example "(t.ref:like:'SO-%') and (t.date_creation:<:'20160101')"
+	 * @param string           $sqlfilters          Other criteria to filter answers separated by a comma. Syntax example "(t.ref:like:'SO-%') and (t.date_creation:>:'20160101')"
 	 * @param string		   $properties			Restrict the data returned to these properties. Ignored if empty. Comma separated list of properties names
 	 * @return  array                               Array of order objects
 	 * @phan-return BOM[]
@@ -261,7 +261,7 @@ class Boms extends DolibarrApi
 
 			if ($field == 'array_options' && is_array($value)) {
 				foreach ($value as $index => $val) {
-					$this->bom->array_options[$index] = $this->_checkValForAPI($field, $val, $this->bom);
+					$this->bom->array_options[$index] = $this->_checkValExtrafieldsForAPI($index, $val, $this->bom);
 				}
 				continue;
 			}
@@ -519,9 +519,12 @@ class Boms extends DolibarrApi
 	// phpcs:disable PEAR.NamingConventions.ValidFunctionName.PublicUnderscore
 	/**
 	 * Clean sensible object datas
+	 * @phpstan-template T
 	 *
 	 * @param   Object  $object     Object to clean
 	 * @return  Object              Object with cleaned properties
+	 * @phpstan-param T $object
+	 * @phpstan-return T
 	 */
 	protected function _cleanObjectDatas($object)
 	{
@@ -620,17 +623,21 @@ class Boms extends DolibarrApi
 	private function checkRefNumbering()
 	{
 		$ref = substr($this->bom->ref, 1, 4);
-		if ($this->bom->status > 0 && $ref == 'PROV') {
+		if ($this->bom->status > BOM::STATUS_DRAFT && $ref == 'PROV') {
 			throw new RestException(400, "Wrong naming scheme '(PROV%)' is only allowed on 'DRAFT' status. For automatic increment use 'auto' on the 'ref' field.");
 		}
 
 		if (strtolower($this->bom->ref) == 'auto') {
-			if (empty($this->bom->id) && $this->bom->status == 0) {
+			if (empty($this->bom->id) && $this->bom->status == BOM::STATUS_DRAFT) {
 				$this->bom->ref = ''; // 'ref' will auto incremented with '(PROV' + newID + ')'
 			} else {
-				$this->bom->fetch_product();
-				$numref = $this->bom->getNextNumRef($this->bom->product);
-				$this->bom->ref = $numref;
+				$res = $this->bom->fetch_product();
+				if ($res > 0 && $this->bom->product instanceof Product) {
+					$numref = $this->bom->getNextNumRef($this->bom->product); // @phan-suppress-current-line PhanTypeMismatchArgumentNullable
+					$this->bom->ref = $numref;
+				} else {
+					throw new RestException(400, "Error when generating automatic increment on the 'ref' field.");
+				}
 			}
 		}
 	}

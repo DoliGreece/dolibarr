@@ -2,7 +2,7 @@
 <?php
 /*
  * Copyright (C) 2023-2024 	Laurent Destailleur 	<eldy@users.sourceforge.net>
- * Copyright (C) 2024		MDW						<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2024-2026	MDW						<mdeweerd@users.noreply.github.com>
  * Copyright (C) 2024       Frédéric France         <frederic.france@free.fr>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -61,7 +61,7 @@ if (empty($argv[1])) {
 $outputpath = $argv[1];
 $outputdir = dirname($outputpath);
 $outputfile = basename($outputpath);
-$outputfilerss = preg_replace('/\.\w+$/i', '', $outputfile).'-security.rss';
+$outputfilerss = preg_replace('/\.\w+$/i', '', $outputfile).'-security.rss';	// Replace the .html by -security.rss
 
 if (!is_dir($outputdir)) {
 	print 'Error: dir '.$outputdir.' does not exists or is not writable'."\n";
@@ -103,7 +103,7 @@ $PHPSTANLEVEL = 9;
 // PHAN setup. Configuration is required, otherwise phan is disabled.
 $PHAN_CONFIG = "{$path}phan/config_extended.php";
 $PHAN_BASELINE = "{$path}phan/baseline_extended.txt";		// BASELINE is ignored if it does not exist
-$PHAN_MIN_PHP = "7.0";
+$PHAN_MIN_PHP = "7.2";  // Set to minimum target version, avoids PhanCompatibleNullableTypePHP70 for instance
 $PHAN_MEMORY_OPT = "--memory-limit 5G";
 
 if (!is_readable($PHAN_CONFIG)) {
@@ -169,7 +169,7 @@ $output_phan_json = array();
 $res_exec_phan = 0;
 if ($dir_phan != 'disabled') {
 	if (is_readable($PHAN_BASELINE)) {
-		$PHAN_BASELINE_OPT = "-B '${PHAN_BASELINE}'";
+		$PHAN_BASELINE_OPT = "-B '{$PHAN_BASELINE}'";
 	} else {
 		$PHAN_BASELINE_OPT = '';
 	}
@@ -194,7 +194,7 @@ foreach (array('proj', 'dep') as $source) {
 	print 'Analyze SCC result for lines of code for '.$source."\n";
 	if ($source == 'proj') {
 		$output_arr = &$output_arrproj;
-	} elseif ($source == 'dep') {
+	} elseif ($source == 'dep') {  // @phpstan-ignore equal.alwaysTrue
 		$output_arr = &$output_arrdep;
 	} else {
 		print 'Bad value for $source';
@@ -221,13 +221,13 @@ foreach (array('proj', 'dep') as $source) {
 			$arrayofmetrics[$source]['Bytes'] = $reg[1];
 		}
 
-		if (preg_match('/^(.*)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)$/', $line, $reg)) {
-			$arrayoflineofcode[$source][$reg[1]]['Files'] = $reg[2];
-			$arrayoflineofcode[$source][$reg[1]]['Lines'] = $reg[3];
-			$arrayoflineofcode[$source][$reg[1]]['Blanks'] = $reg[4];
-			$arrayoflineofcode[$source][$reg[1]]['Comments'] = $reg[5];
-			$arrayoflineofcode[$source][$reg[1]]['Code'] = $reg[6];
-			$arrayoflineofcode[$source][$reg[1]]['Complexity'] = $reg[7];
+		if (preg_match('/^(.*)\s+([\d,]+)\s+([\d,]+)\s+([\d,]+)\s+([\d,]+)\s+([\d,]+)\s+([\d,]+)$/', $line, $reg)) {
+			$arrayoflineofcode[$source][$reg[1]]['Files'] = str_replace(array(',', ' '), array('', ''), $reg[2]);
+			$arrayoflineofcode[$source][$reg[1]]['Lines'] = str_replace(array(',', ' '), array('', ''), $reg[3]);
+			$arrayoflineofcode[$source][$reg[1]]['Blanks'] = str_replace(array(',', ' '), array('', ''), $reg[4]);
+			$arrayoflineofcode[$source][$reg[1]]['Comments'] = str_replace(array(',', ' '), array('', ''), $reg[5]);
+			$arrayoflineofcode[$source][$reg[1]]['Code'] = str_replace(array(',', ' '), array('', ''), $reg[6]);
+			$arrayoflineofcode[$source][$reg[1]]['Complexity'] = str_replace(array(',', ' '), array('', ''), $reg[7]);
 		}
 	}
 
@@ -271,7 +271,7 @@ $nbofmonth = 6;
 $delay = (3600 * 24 * 30 * $nbofmonth);
 $arrayofalerts = array();
 
-$commandcheck = "git log --all --shortstat --no-renames --use-mailmap --pretty=".escapeshellarg('format:%cI;%H;%aN;%aE;%ce;%s')." --since=".escapeshellarg(dol_print_date(dol_now() - $delay, '%Y-%m-%d'))." | grep -i -E ".escapeshellarg("(#yogosha|CVE|Sec:|Sec |Sec$)");
+$commandcheck = "git log --all --shortstat --no-renames --use-mailmap --pretty=".escapeshellarg('format:%cI;%H;%aN;%aE;%ce;%s')." --since=".escapeshellarg(dol_print_date(dol_now() - $delay, '%Y-%m-%d'))." | grep -i -E ".escapeshellarg("(#ghsa|#yogosha|CVE|Sec:|Sec |^Sec$)");
 print 'Execute git log to get commits related to security: '.$commandcheck."\n";
 $output_arrglpu = array();
 $resexecglpu = 0;
@@ -280,12 +280,12 @@ foreach ($output_arrglpu as $valgitlog) {		// The most recent lines are first.
 	// Parse the line to split interesting data
 	$tmpval = cleanVal2($valgitlog);
 
-	if (preg_match('/(#yogosha|CVE[\s\-]*\d|Sec:|Sec\s|Sec$)/i', $tmpval['title'])) {	// Recommended git comment:  "Sec: Fix #..."
+	if (preg_match('/(#ghsa|#yogosha|CVE[\s\-]*\d|Sec:|Sec\s|^Sec$)/i', $tmpval['title'])) {	// Recommended git comment:  "Fix #..."
 		$alreadyfound = '';
 		$alreadyfoundcommitid = '';
 		foreach ($arrayofalerts as $val) {	// Loop on already found alerts
-			if ($val['issueidyogosha'] && $val['issueidyogosha'] == $tmpval['issueidyogosha']) {	// Already in list
-				$alreadyfound = 'yogosha';
+			if ($val['issueidvdp'] && $val['issueidvdp'] == $tmpval['issueidvdp']) {	// Already in list
+				$alreadyfound = 'vdp';
 				$alreadyfoundcommitid = $val['commitid'];
 				break;
 			}
@@ -317,7 +317,7 @@ foreach ($output_arrglpu as $valgitlog) {		// The most recent lines are first.
 			exec($commandgetbranch, $output_arrgetbranch, $resexecgetbranch);
 
 			foreach ($output_arrgetbranch as $valbranch) {
-				if (empty($tmpval['branch'])) {
+				if (!array_key_exists('branch', $tmpval)) {
 					$tmpval['branch'] = array();
 				}
 				if (preg_match('/^\s*origin\/(develop|\d)/', $valbranch)) {
@@ -326,8 +326,8 @@ foreach ($output_arrglpu as $valgitlog) {		// The most recent lines are first.
 			}
 
 			$arrayofalerts[$tmpval['commitid']] = $tmpval;
-		} else {
-			if (empty($arrayofalerts[$alreadyfoundcommitid]['commitidbis'])) {
+		} else { // Test for static analysis
+			if (!array_key_exists($alreadyfoundcommitid, $arrayofalerts) || !array_key_exists('commitidbis', $arrayofalerts[$alreadyfoundcommitid])) {
 				$arrayofalerts[$alreadyfoundcommitid]['commitidbis'] = array();
 			}
 
@@ -339,7 +339,7 @@ foreach ($output_arrglpu as $valgitlog) {		// The most recent lines are first.
 			exec($commandgetbranch, $output_arrgetbranch, $resexecgetbranch);
 
 			foreach ($output_arrgetbranch as $valbranch) {
-				if (empty($tmpval['branch'])) {
+				if (!array_key_exists('branch', $tmpval)) {
 					$tmpval['branch'] = array();
 				}
 				if (preg_match('/^\s*origin\/(develop|\d)/', $valbranch)) {
@@ -599,7 +599,7 @@ foreach (array('proj', 'dep') as $source) {
 			$html .= '<td class="right nowrap">'.(empty($val['Files']) ? '' : formatNumber($val['Files'])).'</td>';
 			$html .= '<td class="right nowrap">'.(empty($val['Lines']) ? '' : formatNumber($val['Lines'])).'</td>';
 			$html .= '<td class="nowrap">';
-			$percent = $val['Lines'] / $arrayofmax['Lines'];
+			$percent = (float) $val['Lines'] / (int) $arrayofmax['Lines'];
 			$widthbar = round(200 * $percent);
 			$html .= '<div class="bargraph" style="width: '.max(1, $widthbar).'px">&nbsp;</div>';
 			$html .= '</td>';
@@ -755,7 +755,7 @@ $html .= '</div>';
 if (array_key_exists('proj', $arraycocomo)) {
 	$html .= '<div class="box inline-box back2">';
 	$html .= 'COCOMO effort<br><span class="small opacitymedium">(Basic/Semi-detached model)</span><br>';
-	$html .= '<b>'.formatNumber($arraycocomo['proj']['people'] * $arraycocomo['proj']['effort'] + $arraycocomo['dep']['people'] * $arraycocomo['dep']['effort']);
+	$html .= '<b>'.formatNumber((int) $arraycocomo['proj']['people'] * (float) $arraycocomo['proj']['effort'] + (int) $arraycocomo['dep']['people'] * (float) $arraycocomo['dep']['effort']);
 	$html .= ' months people</b>';
 	$html .= '</div>';
 }
@@ -836,15 +836,15 @@ $title_security_short = "Last security issues";
 $title_security = ($project ? "[".$project."] " : "").$title_security_short;
 
 $html .= '<section class="chapter" id="securityalerts">'."\n";
-$html .= '<h2><span class="fas fa-code pictofixedwidth"></span>'.$title_security_short.' <span class="opacitymedium">(last '.($nbofmonth != 1 ? $nbofmonth.' months' : 'month').')</span></h2>'."\n";
+$html .= '<h2><span class="fas fa-code pictofixedwidth"></span>'.$title_security_short.' <span class="opacitymedium">(last '.($nbofmonth != 1 ? $nbofmonth.' months' : 'month').')</span></h2>'."\n";  // @phpstan-ignore  notEqual.alwaysTrue
 
 $html .= '<div class="boxallwidth">'."\n";
 $html .= '<div class="div-table-responsive">'."\n";
 $html .= '<table class="list_technical_debt centpercent">'."\n";
-$html .= '<tr class="trgroup"><td>Commit ID</td><td>Date</td><td style="white-space: nowrap">Reported on<br>Yogosha</td><td style="white-space: nowrap">Reported on<br>GIT</td><td style="white-space: nowrap"><a href="https://www.cve.org/CVERecord/SearchResults?query=dolibarr">Reported on<br>CVE</a></td><td>Title</td><td>Branch of fix</td></tr>'."\n";
+$html .= '<tr class="trgroup"><td>Commit ID</td><td>Date</td><td style="white-space: nowrap">Reported on a<br>VDP (GHSA, Yogosha...)</td><td style="white-space: nowrap">Reported on<br>GitHub issues</td><td style="white-space: nowrap"><a href="https://www.cve.org/CVERecord/SearchResults?query=dolibarr">Reported on<br>CVE</a></td><td>Title</td><td>Branch of fix</td></tr>'."\n";
 foreach ($arrayofalerts as $key => $alert) {
 	$cve = '';
-	$yogosha = empty($alert['issueidyogosha']) ? '' : $alert['issueidyogosha'];
+	$vdp = empty($alert['issueidvdp']) ? '' : $alert['issueidvdp'];
 	$arrayofalerts[$key]['url_commit'] = 'https://github.com/Dolibarr/dolibarr/commit/'.$alert['commitid'];
 	if (!empty($alert['issueid'])) {
 		$arrayofalerts[$key]['url_issue'] = 'https://github.com/Dolibarr/dolibarr/issues/'.$alert['issueid'];
@@ -853,7 +853,7 @@ foreach ($arrayofalerts as $key => $alert) {
 		$cve = preg_replace('/\s+/', '-', trim($alert['issueidcve']));
 		$arrayofalerts[$key]['url_cve'] = 'https://nvd.nist.gov/vuln/detail/CVE-'.$cve;
 	}
-	$arrayofalerts[$key]['title'] = ($project ? "[".$project."] " : "").'Security alert - '.($yogosha ? ' Yogosha #'.$yogosha.' - ' : '').($cve ? 'CVE-'.$cve.' - ' : '');
+	$arrayofalerts[$key]['title'] = ($project ? "[".$project."] " : "").'Security alert - '.($vdp ? ' VDP #'.$vdp.' - ' : '').($cve ? 'CVE-'.$cve.' - ' : '');
 	$arrayofalerts[$key]['title'] .= 'Fix committed as: '.dol_trunc($alert['commitid'], 8);
 
 	$arrayofalerts[$key]['description'] = '<![CDATA[Security alert<br>';
@@ -880,13 +880,11 @@ foreach ($arrayofalerts as $key => $alert) {
 	$html .= preg_replace('/T.*$/', '', $alert['created_at']);
 	$html .= '</td>';
 
-	// Yogosha ID
+	// VDP ID
 	$html .= '<td style="white-space: nowrap">';
-	if (!empty($alert['issueidyogosha'])) {
-		//$html .= '<a target="_blank" href="https://yogosha.com?'.$alert['issueidyogosha'].'">';
-		$html .= '#yogosha'.$alert['issueidyogosha'];
-		$arrayofalerts[$key]['description'] .= "\n<br>".'Yogosha ID #'.$alert['issueidyogosha'];
-		//$html .= '</a>';
+	if (!empty($alert['issueidvdp'])) {
+		$html .= '#'.$alert['issueidvdp'];
+		$arrayofalerts[$key]['description'] .= "\n<br>".'VDP ID #'.$alert['issueidvdp'];
 	} else {
 		//$html .= '<span class="opacitymedium">public issue</span>';
 	}
@@ -932,7 +930,7 @@ $html .= '</div>';
 $html .= '</div>';
 
 $html .= '<br>';
-$html .= 'Note:Search is done in git repository on regex string "#yogosha|CVE[\s\-]*\d|Sec:|Sec\s" (not case sensitive)<br>';
+$html .= 'Note:Search is done in git repository on regex string "#ghsa|#yogosha|CVE[\s\-]*\d|Sec:|Sec |^Sec\s" (not case sensitive)<br>';
 $html .= 'You can use this URL for RSS notifications: <a href="/'.$outputfilerss.'">'.$outputfilerss.'</a><br><br>';
 
 $html .= '</section>';
@@ -973,6 +971,18 @@ if ($fh) {
 	}
 	fwrite($fh, '</image>'."\n");
 
+
+	// Loop on arrayofalert to remove alerts that are on develop
+	foreach ($arrayofalerts as $tmpkey => $alert) {
+		$arrayuniquetmp = array_unique($alert['branch']);
+		if (count($arrayuniquetmp) == 1 && in_array('develop', $arrayuniquetmp)) {
+			// The alert has been fixed into develop only, so we discard it for RSS alert
+			print 'The alert with key '.$tmpkey.' is fixed into branch develop only, so we discard it for RSS'."\n";
+			unset($arrayofalerts[$tmpkey]);
+		}
+	}
+
+	// Loop on array of alerts on stable branches
 	foreach ($arrayofalerts as $alert) {
 		$alert['url_commit'] = 'https://github.com/Dolibarr/dolibarr/commit/'.$alert['commitid'];
 
@@ -1093,8 +1103,8 @@ if ($fh) {
 /**
  * function to format a number
  *
- * @param	string|int		$number			Number to format
- * @param	int				$nbdec			Number of decimal digits
+ * @param	string|float	$number			Number to format
+ * @param	int<0,max>		$nbdec			Number of decimal digits
  * @return	string							Formatted string
  */
 function formatNumber($number, $nbdec = 0)
@@ -1105,8 +1115,8 @@ function formatNumber($number, $nbdec = 0)
 /**
  * cleanVal
  *
- * @param array 	$val		Array of a PR
- * @return 						Array of a PR
+ * @param object 	$val		Array of a PR
+ * @return array{url:string,number:string,title:string,created_at:string,updated_at:string}	Array of a PR
  */
 function cleanVal($val)
 {
@@ -1124,8 +1134,8 @@ function cleanVal($val)
 /**
  * cleanVal2
  *
- * @param array 	$val		Array of a PR
- * @return 						Array of a PR
+ * @param string 	$val		Line of a PR
+ * @return array{commitid:string,url:string,issueid:string,issueidvdp:string,issueidcve:string,title:string,created_at:string,updated_at:string,branch:string[]}	Array of a PR
  */
 function cleanVal2($val)
 {
@@ -1135,11 +1145,12 @@ function cleanVal2($val)
 	$tmpval['commitid'] = $tmp[1];
 	$tmpval['url'] = '';
 	$tmpval['issueid'] = '';
-	$tmpval['issueidyogosha'] = '';
+	$tmpval['issueidvdp'] = '';
 	$tmpval['issueidcve'] = '';
 	$tmpval['title'] = array_key_exists(5, $tmp) ? preg_replace('/\.$/', '', $tmp[5]) : '';
 	$tmpval['created_at'] = array_key_exists(0, $tmp) ? $tmp[0] : '';
 	$tmpval['updated_at'] = '';
+	$tmpval['branch'] = array();
 
 	$reg = array();
 	if (preg_match('/#(\d+)/', $tmpval['title'], $reg)) {
@@ -1148,8 +1159,11 @@ function cleanVal2($val)
 	if (preg_match('/CVE([0-9\-\s]+)/', $tmpval['title'], $reg)) {
 		$tmpval['issueidcve'] = preg_replace('/^\-/', '', preg_replace('/\s+/', '-', trim($reg[1])));
 	}
-	if (preg_match('/#yogosha(\d+)/i', $tmpval['title'], $reg)) {
-		$tmpval['issueidyogosha'] = $reg[1];
+	if (preg_match('/#(yogosha\d+)/i', $tmpval['title'], $reg)) {
+		$tmpval['issueidvdp'] = strtolower($reg[1]);
+	}
+	if (preg_match('/#(ghsa[a-z\-\d]+)/i', $tmpval['title'], $reg)) {
+		$tmpval['issueidvdp'] = strtolower($reg[1]);
 	}
 
 	return $tmpval;

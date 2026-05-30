@@ -12,9 +12,9 @@
  * Copyright (C) 2016		Ferran Marcet				<fmarcet@2byte.es>
  * Copyright (C) 2018-2023	Charlene Benke				<charlene@patas-monkey.com>
  * Copyright (C) 2021-2024	Alexandre Spangaro			<alexandre@inovea-conseil.com>
- * Copyright (C) 2024-2025	MDW							<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2024-2026	MDW							<mdeweerd@users.noreply.github.com>
  * Copyright (C) 2024		Benjamin Falière			<benjamin.faliere@altairis.fr>
- * Copyright (C) 2024-2025  Frédéric France         <frederic.france@free.fr>
+ * Copyright (C) 2024-2026  Frédéric France         <frederic.france@free.fr>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -106,6 +106,8 @@ $search_multicurrency_montant_vat = GETPOST('search_multicurrency_montant_vat', 
 $search_multicurrency_montant_ttc = GETPOST('search_multicurrency_montant_ttc', 'alpha');
 $search_project_ref = GETPOST('search_project_ref', 'alpha');
 $search_status = GETPOST('search_status', 'intcomma');
+$search_note_private = GETPOST('search_note_private', 'alpha');
+$search_note_public = GETPOST('search_note_public', 'alpha');
 $search_product_category = GETPOST('search_product_category', 'int');
 $searchCategorySupplierPropalList = GETPOST('search_category_supplier_proposal_list', 'array:int');
 $searchCategorySupplierPropalOperator = 0;
@@ -142,7 +144,7 @@ if ($object_statut != '') {
 	$search_status = $object_statut;
 }
 
-// Nombre de ligne pour choix de produit/service predefinis
+// Number of line to choose predefined product/service from
 $NBLINES = 4;
 
 // Security check
@@ -211,6 +213,8 @@ $arrayfields = array(
 	'u.login' => array('label' => $langs->trans("Author"), 'checked' => '1', 'position' => 10),
 	'sp.datec' => array('label' => $langs->trans("DateCreation"), 'checked' => '0', 'position' => 500),
 	'sp.tms' => array('label' => $langs->trans("DateModificationShort"), 'checked' => '0', 'position' => 500),
+	'sp.note_public' => array('label' => 'NotePublic', 'checked' => '0', 'position' => 520, 'enabled' => (getDolGlobalInt('MAIN_LIST_HIDE_PUBLIC_NOTES') ? '0' : '1')),
+	'sp.note_private' => array('label' => 'NotePrivate', 'checked' => '0', 'position' => 521, 'enabled' => (getDolGlobalInt('MAIN_LIST_HIDE_PRIVATE_NOTES') ? '0' : '1')),
 	'sp.fk_statut' => array('label' => $langs->trans("Status"), 'checked' => '1', 'position' => 1000),
 );
 // Extra fields
@@ -451,6 +455,12 @@ if ($search_date_end) {
 }
 if ($search_date_valid_start) {
 	$sql .= " AND sp.date_valid >= '".$db->idate($search_date_valid_start)."'";
+}
+if ($search_note_public) {
+	$sql .= " AND p.note_public LIKE '%".$db->escape($db->escapeforlike($search_note_public))."%'";
+}
+if ($search_note_private) {
+	$sql .= " AND p.note_private LIKE '%".$db->escape($db->escapeforlike($search_note_private))."%'";
 }
 if ($search_date_valid_end) {
 	$sql .= " AND sp.date_valid <= '".$db->idate($search_date_valid_end)."'";
@@ -798,7 +808,7 @@ if ($resql) {
 	}
 
 	$varpage = empty($contextpage) ? $_SERVER["PHP_SELF"] : $contextpage;
-	$selectedfields = $form->multiSelectArrayWithCheckbox('selectedfields', $arrayfields, $varpage, getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')); // This also change content of $arrayfields
+	$selectedfields = $form->multiSelectArrayWithCheckbox('selectedfields', $arrayfields, $varpage, $conf->main_checkbox_left_column); // This also change content of $arrayfields
 	$selectedfields .= (count($arrayofmassactions) ? $form->showCheckAddButtons('checkforselect', 1) : '');
 
 	print '<div class="div-table-responsive">';
@@ -808,7 +818,7 @@ if ($resql) {
 	// --------------------------------------------------------------------
 	print '<tr class="liste_titre_filter">';
 	// Action column
-	if (getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+	if ($conf->main_checkbox_left_column) {
 		print '<td class="liste_titre maxwidthsearch">';
 		$searchpicto = $form->showFilterButtons('left');
 		print $searchpicto;
@@ -856,7 +866,7 @@ if ($resql) {
 	// Company type
 	if (!empty($arrayfields['typent.code']['checked'])) {
 		print '<td class="liste_titre maxwidthonsmartphone center">';
-		print $form->selectarray("search_type_thirdparty", $formcompany->typent_array(0), $search_type_thirdparty, 1, 0, 0, '', 0, 0, 0, (!getDolGlobalString('SOCIETE_SORT_ON_TYPEENT') ? 'ASC' : $conf->global->SOCIETE_SORT_ON_TYPEENT), '', 1);
+		print $form->selectarray("search_type_thirdparty", $formcompany->typent_array(0), $search_type_thirdparty, 1, 0, 0, '', 0, 0, 0, getDolGlobalString('SOCIETE_SORT_ON_TYPEENT', 'ASC'), '', 1);
 		print '</td>';
 	}
 	// Date
@@ -952,6 +962,18 @@ if ($resql) {
 		print '<td class="liste_titre">';
 		print '</td>';
 	}
+	if (!empty($arrayfields['sp.note_public']['checked'])) {
+		// Note public
+		print '<td class="liste_titre">';
+		print '<input class="flat maxwidth75" type="text" name="search_note_public" value="'.dol_escape_htmltag($search_note_public).'">';
+		print '</td>';
+	}
+	if (!empty($arrayfields['sp.note_private']['checked'])) {
+		// Note private
+		print '<td class="liste_titre">';
+		print '<input class="flat maxwidth75" type="text" name="search_note_private" value="'.dol_escape_htmltag($search_note_private).'">';
+		print '</td>';
+	}
 	// Status
 	if (!empty($arrayfields['sp.fk_statut']['checked'])) {
 		print '<td class="liste_titre center parentonrightofpage">';
@@ -959,7 +981,7 @@ if ($resql) {
 		print '</td>';
 	}
 	// Action column
-	if (!getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+	if (!$conf->main_checkbox_left_column) {
 		print '<td class="liste_titre maxwidthsearch">';
 		$searchpicto = $form->showFilterButtons();
 		print $searchpicto;
@@ -973,7 +995,7 @@ if ($resql) {
 
 	// Fields title
 	print '<tr class="liste_titre">';
-	if (getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+	if ($conf->main_checkbox_left_column) {
 		print_liste_field_titre($selectedfields, $_SERVER["PHP_SELF"], "", '', '', '', $sortfield, $sortorder, 'center maxwidthsearch ');
 		$totalarray['nbfield']++;
 	}
@@ -1074,12 +1096,20 @@ if ($resql) {
 		print_liste_field_titre($arrayfields['sp.tms']['label'], $_SERVER["PHP_SELF"], "sp.tms", "", $param, '', $sortfield, $sortorder, 'center nowrap');
 		$totalarray['nbfield']++;
 	}
+	if (!empty($arrayfields['sp.note_public']['checked'])) {
+		print_liste_field_titre($arrayfields['sp.note_public']['label'], $_SERVER["PHP_SELF"], "sp.note_public", "", $param, '', $sortfield, $sortorder, 'center nowrap ');
+		$totalarray['nbfield']++;
+	}
+	if (!empty($arrayfields['sp.note_private']['checked'])) {
+		print_liste_field_titre($arrayfields['sp.note_private']['label'], $_SERVER["PHP_SELF"], "sp.note_private", "", $param, '', $sortfield, $sortorder, 'center nowrap ');
+		$totalarray['nbfield']++;
+	}
 	if (!empty($arrayfields['sp.fk_statut']['checked'])) {
 		print_liste_field_titre($arrayfields['sp.fk_statut']['label'], $_SERVER["PHP_SELF"], "sp.fk_statut", "", $param, '', $sortfield, $sortorder, 'center ');
 		$totalarray['nbfield']++;
 	}
 	// Action
-	if (!getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+	if (!$conf->main_checkbox_left_column) {
 		print_liste_field_titre($selectedfields, $_SERVER["PHP_SELF"], "", '', '', '', $sortfield, $sortorder, 'center maxwidthsearch ');
 		$totalarray['nbfield']++;
 	}
@@ -1134,7 +1164,7 @@ if ($resql) {
 		} else {
 			print '<tr class="oddeven row-with-select '.((getDolGlobalInt('MAIN_FINISHED_LINES_OPACITY') == 1 && $obj->status > 1) ? 'opacitymedium' : '').'">';
 			// Action column
-			if (getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+			if ($conf->main_checkbox_left_column) {
 				print '<td class="nowrap center">';
 				if ($massactionbutton || $massaction) {   // If we are in select mode (massactionbutton defined) or if we have already selected and sent an action ($massaction) defined
 					$selected = 0;
@@ -1398,6 +1428,24 @@ if ($resql) {
 					$totalarray['nbfield']++;
 				}
 			}
+			// Note public
+			if (!empty($arrayfields['f.note_public']['checked'])) {
+				print '<td class="sensiblehtmlcontent center">';
+				print '<div class="small lineheightsmall twolinesmax-normallineheight">'.dolPrintHTML(dolGetFirstLineOfText($obj->note_public, 5)).'</div>';
+				print '</td>';
+				if (!$i) {
+					$totalarray['nbfield']++;
+				}
+			}
+			// Note private
+			if (!empty($arrayfields['f.note_private']['checked'])) {
+				print '<td class="sensiblehtmlcontent center">';
+				print '<div class="small lineheightsmall twolinesmax-normallineheight">'.dolPrintHTML(dolGetFirstLineOfText($obj->note_private, 5)).'</div>';
+				print '</td>';
+				if (!$i) {
+					$totalarray['nbfield']++;
+				}
+			}
 			// Status
 			if (!empty($arrayfields['sp.fk_statut']['checked'])) {
 				print '<td class="center">'.$objectstatic->getLibStatut(5)."</td>\n";
@@ -1407,7 +1455,7 @@ if ($resql) {
 			}
 
 			// Action column
-			if (!getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+			if (!$conf->main_checkbox_left_column) {
 				print '<td class="nowrap center">';
 				if ($massactionbutton || $massaction) {   // If we are in select mode (massactionbutton defined) or if we have already selected and sent an action ($massaction) defined
 					$selected = 0;

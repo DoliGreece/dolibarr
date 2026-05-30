@@ -1,6 +1,6 @@
 <?php
 /* Copyright (C) 2017-2023  Laurent Destailleur     <eldy@users.sourceforge.net>
- * Copyright (C) 2019-2025  Frédéric France         <frederic.france@free.fr>
+ * Copyright (C) 2019-2026  Frédéric France         <frederic.france@free.fr>
  * Copyright (C) 2023       Charlene Benke          <charlene@patas-monkey.com>
  * Copyright (C) 2024-2025	MDW						<mdeweerd@users.noreply.github.com>
  *
@@ -30,6 +30,7 @@ require '../main.inc.php';
  * The main.inc.php has been included so the following variable are now defined:
  * @var Conf $conf
  * @var DoliDB $db
+ * @var ExtraFields $extrafields
  * @var HookManager $hookmanager
  * @var Societe $mysoc
  * @var Translate $langs
@@ -51,7 +52,7 @@ $lineid  = GETPOSTINT('lineid');
 $ref     = GETPOST('ref', 'alpha');
 $action  = GETPOST('action', 'aZ09');
 $confirm = GETPOST('confirm', 'alpha');
-$cancel  = GETPOST('cancel', 'aZ09');
+$cancel  = GETPOST('cancel', 'alpha');
 $contextpage = GETPOST('contextpage', 'aZ') ? GETPOST('contextpage', 'aZ') : 'bomcard'; // To manage different context of search
 $backtopage  = GETPOST('backtopage', 'alpha');
 
@@ -63,7 +64,6 @@ $hideref = (GETPOSTINT('hideref') ? GETPOSTINT('hideref') : (getDolGlobalString(
 
 // Initialize a technical objects
 $object = new BOM($db);
-$extrafields = new ExtraFields($db);
 $diroutputmassaction = getMultidirOutput($object) . '/temp/massgeneration/'.$user->id;
 $hookmanager->initHooks(array('bomcard', 'globalcard')); // Note that conf->hooks_modules contains array
 
@@ -153,8 +153,8 @@ if (empty($reshook)) {
 	include DOL_DOCUMENT_ROOT.'/core/actions_builddoc.inc.php';
 
 	// Actions to send emails
-	$triggersendname = 'BOM_SENTBYMAIL';
-	$autocopy = 'MAIN_MAIL_AUTOCOPY_BOM_TO';
+	$triggersendname = $object->TRIGGER_PREFIX.'_SENTBYMAIL';
+	$autocopy = 'MAIN_MAIL_AUTOCOPY_'.$object->TRIGGER_PREFIX.'_TO';
 	$trackid = 'bom'.$object->id;
 	include DOL_DOCUMENT_ROOT.'/core/actions_sendmails.inc.php';
 
@@ -166,6 +166,7 @@ if (empty($reshook)) {
 
 		// Set if we used free entry or predefined product
 		$bom_child_id = GETPOSTINT('bom_id');
+		$idprod = 0;
 		if ($bom_child_id > 0) {
 			$bom_child = new BOM($db);
 			$res = $bom_child->fetch($bom_child_id);
@@ -404,18 +405,23 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 	// Confirmation of validation
 	if ($action == 'validate') {
+		$error = 0;
+		$numref = '';
 		// We check that object has a temporary ref
 		$ref = substr($object->ref, 1, 4);
 		if ($ref == 'PROV') {
-			$object->fetch_product();
-			$numref = $object->getNextNumRef($object->product);
+			$res = $object->fetch_product();
+			if ($res > 0 && $object->product instanceof Product) {
+				$numref = $object->getNextNumRef($object->product); // @phan-suppress-current-line PhanTypeMismatchArgumentNullable
+			} else {
+				$error++;
+			}
 		} else {
 			$numref = (string) $object->ref;
 		}
 
 		$text = $langs->trans('ConfirmValidateBom', $numref);
-		/*if (isModEnabled('notification'))
-		 {
+		/*if (isModEnabled('notification')) {
 		 require_once DOL_DOCUMENT_ROOT . '/core/class/notify.class.php';
 		 $notify = new Notify($db);
 		 $text .= '<br>';
@@ -431,15 +437,18 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 				// array('type' => 'checkbox', 'name' => 'update_prices', 'label' => $langs->trans("PuttingPricesUpToDate"), 'value' => 1),
 			);
 		}
-
-		$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id, $langs->trans('Validate'), $text, 'confirm_validate', $formquestion, 0, 1, 220);
+		if (!$error) {
+			$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id, $langs->trans('Validate'), $text, 'confirm_validate', $formquestion, 0, 1, 220);
+		} else {
+			setEventMessage($langs->trans('Error'), 'errors');
+			$action = '';
+		}
 	}
 
 	// Confirmation of closing
 	if ($action == 'close') {
 		$text = $langs->trans('ConfirmCloseBom', $object->ref);
-		/*if (isModEnabled('notification'))
-		 {
+		/*if (isModEnabled('notification')) {
 		 require_once DOL_DOCUMENT_ROOT . '/core/class/notify.class.php';
 		 $notify = new Notify($db);
 		 $text .= '<br>';
@@ -462,8 +471,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	// Confirmation of reopen
 	if ($action == 'reopen') {
 		$text = $langs->trans('ConfirmReopenBom', $object->ref);
-		/*if (isModEnabled('notification'))
-		 {
+		/*if (isModEnabled('notification')) {
 		 require_once DOL_DOCUMENT_ROOT . '/core/class/notify.class.php';
 		 $notify = new Notify($db);
 		 $text .= '<br>';
@@ -524,12 +532,10 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	 // Thirdparty
 	 $morehtmlref.='<br>'.$langs->trans('ThirdParty') . ' : ' . $soc->getNomUrl(1);
 	 // Project
-	 if (isModEnabled('project'))
-	 {
+	 if (isModEnabled('project')) {
 	 $langs->load("projects");
 	 $morehtmlref.='<br>'.$langs->trans('Project') . ' ';
-	 if ($permissiontoadd)
-	 {
+	 if ($permissiontoadd) {
 	 if ($action != 'classify')
 	 $morehtmlref.='<a class="editfielda" href="' . dolBuildUrl($_SERVER['PHP_SELF'], ['action' => 'classify', 'id' => $object->id], true) . '">' . img_edit($langs->transnoentitiesnoconv('SetProject')) . '</a> : ';
 	 if ($action == 'classify') {
@@ -774,7 +780,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 			// Clone
 			if ($permissiontoadd) {
-				print dolGetButtonAction($langs->trans("ToClone"), '', 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=clone&object=bom', 'clone', $permissiontoadd);
+				print dolGetButtonAction($langs->trans("ToClone"), '', 'clone', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=clone&object=bom', 'clone', $permissiontoadd);
 			}
 
 			// Close / Cancel

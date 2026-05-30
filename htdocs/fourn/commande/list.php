@@ -1,17 +1,17 @@
 <?php
-/* Copyright (C) 2001-2006 Rodolphe Quiedeville	<rodolphe@quiedeville.org>
- * Copyright (C) 2004-2016 Laurent Destailleur	<eldy@users.sourceforge.net>
- * Copyright (C) 2005-2012 Regis Houssin		<regis.houssin@inodbox.com>
- * Copyright (C) 2013      Cédric Salvador		<csalvador@gpcsolutions.fr>
- * Copyright (C) 2014      Marcos García		<marcosgdf@gmail.com>
- * Copyright (C) 2014      Juanjo Menent		<jmenent@2byte.es>
- * Copyright (C) 2016      Ferran Marcet		<fmarcet@2byte.es>
- * Copyright (C) 2018-2025  Frédéric France		<frederic.france@free.fr>
- * Copyright (C) 2018-2022 Charlene Benke		<charlene@patas-monkey.com>
- * Copyright (C) 2019      Nicolas Zabouri		<info@inovea-conseil.com>
- * Copyright (C) 2021-2023 Alexandre Spangaro   <aspangaro@open-dsi.fr>
- * Copyright (C) 2024-2025	MDW					<mdeweerd@users.noreply.github.com>
- * Copyright (C) 2024		William Mead		<william.mead@manchenumerique.fr>
+/* Copyright (C) 2001-2006  Rodolphe Quiedeville        <rodolphe@quiedeville.org>
+ * Copyright (C) 2004-2016  Laurent Destailleur         <eldy@users.sourceforge.net>
+ * Copyright (C) 2005-2012  Regis Houssin               <regis.houssin@inodbox.com>
+ * Copyright (C) 2013       Cédric Salvador             <csalvador@gpcsolutions.fr>
+ * Copyright (C) 2014       Marcos García               <marcosgdf@gmail.com>
+ * Copyright (C) 2014       Juanjo Menent               <jmenent@2byte.es>
+ * Copyright (C) 2016       Ferran Marcet               <fmarcet@2byte.es>
+ * Copyright (C) 2018-2025  Frédéric France             <frederic.france@free.fr>
+ * Copyright (C) 2018-2022  Charlene Benke              <charlene@patas-monkey.com>
+ * Copyright (C) 2019       Nicolas Zabouri             <info@inovea-conseil.com>
+ * Copyright (C) 2021-2026  Alexandre Spangaro          <alexandre@inovea-conseil.com>
+ * Copyright (C) 2024-2025  MDW                         <mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2024       William Mead                <william.mead@manchenumerique.fr>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -36,6 +36,16 @@
 
 // Load Dolibarr environment
 require '../../main.inc.php';
+
+/**
+ * @var Conf $conf
+ * @var DoliDB $db
+ * @var HookManager $hookmanager
+ * @var Societe $mysoc
+ * @var Translate $langs
+ * @var User $user
+ */
+
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formorder.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formother.class.php';
@@ -48,16 +58,6 @@ require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.commande.class.php';
 require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
 require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
-
-
-/**
- * @var Conf $conf
- * @var DoliDB $db
- * @var HookManager $hookmanager
- * @var Societe $mysoc
- * @var Translate $langs
- * @var User $user
- */
 
 // Load translation files required by the page
 $langs->loadLangs(array("orders", "sendings", 'companies', 'compta', 'bills', 'projects', 'suppliers', 'products'));
@@ -137,6 +137,8 @@ $search_total_tva = GETPOST('search_total_tva', 'alpha');
 $search_total_ttc = GETPOST('search_total_ttc', 'alpha');
 $search_multicurrency_code = GETPOST('search_multicurrency_code', 'alpha');
 $search_multicurrency_tx = GETPOST('search_multicurrency_tx', 'alpha');
+$search_note_private = GETPOST('search_note_private', 'alpha');
+$search_note_public = GETPOST('search_note_public', 'alpha');
 $search_multicurrency_montant_ht = GETPOST('search_multicurrency_montant_ht', 'alpha');
 $search_multicurrency_montant_tva = GETPOST('search_multicurrency_montant_tva', 'alpha');
 $search_multicurrency_montant_ttc = GETPOST('search_multicurrency_montant_ttc', 'alpha');
@@ -160,7 +162,6 @@ if ($search_option == 'recv_late') {
 	$search_status = '3,4';
 }
 
-$diroutputmassaction = $conf->fournisseur->commande->dir_output.'/temp/massgeneration/'.$user->id;
 
 $limit = GETPOSTINT('limit') ? GETPOSTINT('limit') : $conf->liste_limit;
 $sortfield = GETPOST('sortfield', 'aZ09comma');
@@ -187,8 +188,9 @@ $extrafields = new ExtraFields($db);
 
 // fetch optionals attributes and labels
 $extrafields->fetch_name_optionals_label($object->table_element);
-
 $search_array_options = $extrafields->getOptionalsFromPost($object->table_element, '', 'search_');
+
+$diroutputmassaction = getMultidirTemp($object).'/massgeneration/'.$user->id;
 
 // List of fields to search into when doing a "search in all"
 $fieldstosearchall = array();
@@ -357,7 +359,7 @@ if (empty($reshook)) {
 	// Mass actions
 	$objectclass = 'CommandeFournisseur';
 	$objectlabel = 'SupplierOrders';
-	$uploaddir = $conf->fournisseur->commande->dir_output;
+	$uploaddir = getMultidirOutput($object);
 	include DOL_DOCUMENT_ROOT.'/core/actions_massactions.inc.php';
 
 	if ($action == 'validate' && $permissiontovalidate) {
@@ -433,8 +435,8 @@ if (empty($reshook)) {
 				}
 				$objecttmp->socid = $cmd->socid;
 				$objecttmp->type = $objecttmp::TYPE_STANDARD;
-				$objecttmp->cond_reglement_id	= $cmd->cond_reglement_id;
-				$objecttmp->mode_reglement_id	= $cmd->mode_reglement_id;
+				$objecttmp->cond_reglement_id = $cmd->cond_reglement_id;
+				$objecttmp->mode_reglement_id = $cmd->mode_reglement_id;
 				$objecttmp->fk_project = $cmd->fk_project;
 				$objecttmp->multicurrency_code = $cmd->multicurrency_code;
 				$objecttmp->ref_supplier = !empty($cmd->ref_supplier) ? $cmd->ref_supplier : $default_ref_supplier;
@@ -446,8 +448,8 @@ if (empty($reshook)) {
 				}
 
 				$objecttmp->date = $datefacture;
-				$objecttmp->origin    = 'order_supplier';
-				$objecttmp->origin_id = $id_order;
+				$objecttmp->origin = 'order_supplier';
+				$objecttmp->origin_id = (int) $id_order;
 
 				$res = $objecttmp->create($user);
 
@@ -455,6 +457,9 @@ if (empty($reshook)) {
 					$nb_bills_created++;
 					$lastref = $objecttmp->ref;
 					$lastid = $objecttmp->id;
+				} else {
+					setEventMessages($objecttmp->error, $objecttmp->errors, 'errors');
+					$error++;
 				}
 			}
 
@@ -491,6 +496,10 @@ if (empty($reshook)) {
 
 					for ($i = 0; $i < $num; $i++) {
 						$desc = ($lines[$i]->desc ? $lines[$i]->desc : $lines[$i]->libelle);
+						// If we build one invoice for several supplier orders, append the source order reference on the invoice line.
+						if (!empty($createbills_onebythird)) {
+							$desc = dol_concatdesc($desc, $langs->trans("SupplierOrder").' '.$cmd->ref.' - '.dol_print_date($cmd->date, 'day'));
+						}
 						if ($lines[$i]->subprice < 0) {
 							require_once DOL_DOCUMENT_ROOT.'/core/class/discount.class.php';
 
@@ -625,7 +634,7 @@ if (empty($reshook)) {
 
 				// Fac builddoc
 				$donotredirect = 1;
-				$upload_dir = $conf->fournisseur->facture->dir_output;
+				$upload_dir = getMultidirOutput($objecttmp);
 				$permissiontoadd = ($user->hasRight("fournisseur", "facture", "creer") || $user->hasRight("supplier_invoice", "creer"));
 				//include DOL_DOCUMENT_ROOT.'/core/actions_builddoc.inc.php';
 			}
@@ -788,8 +797,8 @@ if (empty($reshook)) {
 		} else {
 			$db->rollback();
 			$action = 'create';
-			$_GET["origin"] = $_POST["origin"];		// Keep this ?
-			$_GET["originid"] = $_POST["originid"];	// Keep this ?
+			$_GET["origin"] = GETPOST("origin", 'alpha');
+			$_GET["originid"] = GETPOSTINT("originid");
 			setEventMessages("Error", null, 'errors');
 			$error++;
 		}
@@ -925,6 +934,12 @@ if ($search_date_delivery_end) {
 }
 if ($search_date_valid_start) {
 	$sql .= " AND cf.date_valid >= '".$db->idate($search_date_valid_start)."'";
+}
+if ($search_note_public) {
+	$sql .= " AND cf.note_public LIKE '%".$db->escape($db->escapeforlike($search_note_public))."%'";
+}
+if ($search_date_approve_start) {
+	$sql .= " AND cf.date_livraison >= '".$db->idate($search_date_approve_start)."'";
 }
 if ($search_date_valid_end) {
 	$sql .= " AND cf.date_valid <= '".$db->idate($search_date_valid_end)."'";
@@ -1408,8 +1423,8 @@ if ($resql) {
 		$moreforfilter .= '</div>';
 	}
 	// alert on late date
-	$moreforfilter .= '<div class="divsearchfield">';
-	$moreforfilter .= $langs->trans('Alert').' <input type="checkbox" name="search_option" value="'.(($search_status == '3,4') ? 'recv_late' : 'late').'"'.((array_search($search_option, array('late','recv_late')) !== false) ? ' checked' : '').'>';
+	$moreforfilter .= '<div class="divsearchfield valignmiddle" title="'.$langs->trans("Alert").' '.$langs->trans("Late").'">';
+	$moreforfilter .= '<label class="valignmiddle" for="search_option">'.$langs->trans('Alert').'</label> <input type="checkbox" class="valignmiddle" id="search_option" name="search_option" value="'.(($search_status == '3,4') ? 'recv_late' : 'late').'"'.((array_search($search_option, array('late','recv_late')) !== false) ? ' checked' : '').'>';
 	$moreforfilter .= '</div>';
 	$parameters = array();
 	$reshook = $hookmanager->executeHooks('printFieldPreListTitle', $parameters, $object, $action); // Note that $action and $object may have been modified by hook
@@ -1426,7 +1441,7 @@ if ($resql) {
 	}
 
 	$varpage = empty($contextpage) ? $_SERVER["PHP_SELF"] : $contextpage;
-	$selectedfields = $form->multiSelectArrayWithCheckbox('selectedfields', $arrayfields, $varpage, getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')); // This also change content of $arrayfields
+	$selectedfields = $form->multiSelectArrayWithCheckbox('selectedfields', $arrayfields, $varpage, $conf->main_checkbox_left_column); // This also change content of $arrayfields
 	$selectedfields .= $form->showCheckAddButtons('checkforselect', 1);
 
 	if (GETPOSTINT('autoselectall')) {
@@ -1444,7 +1459,7 @@ if ($resql) {
 
 	print '<tr class="liste_titre_filter">';
 	// Action column
-	if (getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+	if ($conf->main_checkbox_left_column) {
 		print '<td class="liste_titre middle">';
 		$searchpicto = $form->showFilterButtons('left');
 		print $searchpicto;
@@ -1499,7 +1514,7 @@ if ($resql) {
 	// Company type
 	if (!empty($arrayfields['typent.code']['checked'])) {
 		print '<td class="liste_titre maxwidthonsmartphone center">';
-		print $form->selectarray("search_type_thirdparty", $formcompany->typent_array(0), $search_type_thirdparty, 1, 0, 0, '', 0, 0, 0, (!getDolGlobalString('SOCIETE_SORT_ON_TYPEENT') ? 'ASC' : $conf->global->SOCIETE_SORT_ON_TYPEENT), '', 1);
+		print $form->selectarray("search_type_thirdparty", $formcompany->typent_array(0), $search_type_thirdparty, 1, 0, 0, '', 0, 0, 0, getDolGlobalString('SOCIETE_SORT_ON_TYPEENT', 'ASC'), '', 1);
 		print '</td>';
 	}
 	// Date order
@@ -1623,18 +1638,20 @@ if ($resql) {
 		print '</div>';
 		print '</td>';
 	}
-	// Note public
 	if (!empty($arrayfields['cf.note_public']['checked'])) {
+		// Note public
 		print '<td class="liste_titre">';
+		print '<input class="flat maxwidth75" type="text" name="search_note_public" value="'.dol_escape_htmltag($search_note_public).'">';
 		print '</td>';
 	}
-	// Note private
 	if (!empty($arrayfields['cf.note_private']['checked'])) {
+		// Note private
 		print '<td class="liste_titre">';
+		print '<input class="flat maxwidth75" type="text" name="search_note_private" value="'.dol_escape_htmltag($search_note_private).'">';
 		print '</td>';
 	}
 	// Action column
-	if (!getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+	if (!$conf->main_checkbox_left_column) {
 		print '<td class="liste_titre center">';
 		$searchpicto = $form->showFilterButtons();
 		print $searchpicto;
@@ -1648,7 +1665,7 @@ if ($resql) {
 
 	// Fields title
 	print '<tr class="liste_titre">';
-	if (getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+	if ($conf->main_checkbox_left_column) {
 		print_liste_field_titre($selectedfields, $_SERVER["PHP_SELF"], "", '', '', '', $sortfield, $sortorder, 'center maxwidthsearch ');
 		$totalarray['nbfield']++;
 	}
@@ -1779,7 +1796,7 @@ if ($resql) {
 		print_liste_field_titre($arrayfields['cf.note_private']['label'], $_SERVER["PHP_SELF"], "cf.note_private", "", $param, '', $sortfield, $sortorder, 'center ');
 		$totalarray['nbfield']++;
 	}
-	if (!getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+	if (!$conf->main_checkbox_left_column) {
 		print_liste_field_titre($selectedfields, $_SERVER["PHP_SELF"], "", '', '', '', $sortfield, $sortorder, 'center maxwidthsearch ');
 		$totalarray['nbfield']++;
 	}
@@ -1817,7 +1834,9 @@ if ($resql) {
 		$objectstatic->total_ht = $obj->total_ht;
 		$objectstatic->total_tva = $obj->total_tva;
 		$objectstatic->total_ttc = $obj->total_ttc;
+		$objectstatic->date = $db->jdate($obj->date_commande);
 		$objectstatic->date_commande = $db->jdate($obj->date_commande);
+		$objectstatic->date_creation = $db->jdate($obj->date_creation);
 		$objectstatic->delivery_date = $db->jdate($obj->delivery_date);
 		$objectstatic->note_public = $obj->note_public;
 		$objectstatic->note_private = $obj->note_private;
@@ -1845,7 +1864,7 @@ if ($resql) {
 		} else {
 			print '<tr class="oddeven row-with-select '.((getDolGlobalInt('MAIN_FINISHED_LINES_OPACITY') == 1 && $obj->billed == 1) ? 'opacitymedium' : '').'">';
 			// Action column
-			if (getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+			if ($conf->main_checkbox_left_column) {
 				print '<td class="nowraponall center">';
 				if ($massactionbutton || $massaction) {   // If we are in select mode (massactionbutton defined) or if we have already selected and sent an action ($massaction) defined
 					$selected = 0;
@@ -1867,7 +1886,7 @@ if ($resql) {
 				print $objectstatic->getNomUrl(1, '', 0, -1, 1);
 				// Other picto tool
 				$filename = dol_sanitizeFileName($obj->ref);
-				$filedir = $conf->fournisseur->commande->dir_output.'/'.dol_sanitizeFileName($obj->ref);
+				$filedir = getMultidirOutput($objectstatic).'/'.dol_sanitizeFileName($obj->ref);
 				print $formfile->getDocumentsLink($objectstatic->element, $filename, $filedir);
 
 				print '</td>'."\n";
@@ -2169,7 +2188,7 @@ if ($resql) {
 			}
 
 			// Action column
-			if (!getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+			if (!$conf->main_checkbox_left_column) {
 				print '<td class="nowrap center">';
 				if ($massactionbutton || $massaction) {   // If we are in select mode (massactionbutton defined) or if we have already selected and sent an action ($massaction) defined
 					$selected = 0;

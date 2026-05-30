@@ -8,7 +8,7 @@
  * Copyright (C) 2015		Marcos García				<marcosgdf@gmail.com>
  * Copyright (C) 2017		Ferran Marcet				<fmarcet@2byte.es>
  * Copyright (C) 2021-2024	Anthony Berton				<anthony.berton@bb2a.fr>
- * Copyright (C) 2018-2025  Frédéric France				<frederic.france@free.fr>
+ * Copyright (C) 2018-2026  Frédéric France				<frederic.france@free.fr>
  * Copyright (C) 2024-2025	MDW							<mdeweerd@users.noreply.github.com>
  * Copyright (C) 2024		Nick Fragoulis
  * Copyright (C) 2024		Alexandre Spangaro			<alexandre@inovea-conseil.com>
@@ -220,8 +220,9 @@ class pdf_cyan extends ModelePDFPropales
 				$arephoto = false;
 				foreach ($pdir as $midir) {
 					if (!$arephoto) {
-						if ($conf->entity != $objphoto->entity) {
-							$dir = $conf->product->multidir_output[$objphoto->entity].'/'.$midir; //Check repertories of current entities
+						$entity = $objphoto->entity;
+						if ($entity !== null && $conf->entity != $entity) {
+							$dir = $conf->product->multidir_output[$entity].'/'.$midir; //Check repertories of current entities
 						} else {
 							$dir = $conf->product->dir_output.'/'.$midir; //Check repertory of the current product
 						}
@@ -318,7 +319,7 @@ class pdf_cyan extends ModelePDFPropales
 				$pdf->SetTitle($outputlangs->convToOutputCharset($object->ref));
 				$pdf->SetSubject($outputlangs->transnoentities("PdfCommercialProposalTitle"));
 				$pdf->SetCreator("Dolibarr ".DOL_VERSION);
-				$pdf->SetAuthor($outputlangs->convToOutputCharset($user->getFullName($outputlangs)));
+				$pdf->SetAuthor($outputlangs->convToOutputCharset($user->getAnonymisableFullName($outputlangs)));
 				$pdf->SetKeyWords($outputlangs->convToOutputCharset($object->ref)." ".$outputlangs->transnoentities("PdfCommercialProposalTitle")." ".$outputlangs->convToOutputCharset($object->thirdparty->name));
 				if (getDolGlobalString('MAIN_DISABLE_PDF_COMPRESSION')) {
 					$pdf->SetCompression(false);
@@ -941,8 +942,8 @@ class pdf_cyan extends ModelePDFPropales
 				}
 
 				// Add terms to sale
-				if (getDolGlobalString('MAIN_INFO_PROPAL_TERMSOFSALE') && getDolGlobalInt('MAIN_PDF_ADD_TERMSOFSALE_PROPAL')) {
-					$termsofsalefilename = getDolGlobalString('MAIN_INFO_PROPAL_TERMSOFSALE');
+				$termsofsalefilename = getDolGlobalString('MAIN_INFO_PROPAL_TERMSOFSALE');
+				if (getDolGlobalInt('MAIN_PDF_ADD_TERMSOFSALE_PROPAL') && $termsofsalefilename) {
 					$termsofsale = $conf->propal->dir_output.'/'.$termsofsalefilename;
 					if (!empty($conf->propal->multidir_output[$object->entity ?? $conf->entity])) {
 						$termsofsale = $conf->propal->multidir_output[$object->entity ?? $conf->entity].'/'.$termsofsalefilename;
@@ -1044,6 +1045,7 @@ class pdf_cyan extends ModelePDFPropales
 				$parameters = array('file' => $file, 'object' => $object, 'outputlangs' => $outputlangs);
 				global $action;
 				$reshook = $hookmanager->executeHooks('afterPDFCreation', $parameters, $this, $action); // Note that $action and $object may have been modified by some hooks
+				$this->warnings = $hookmanager->warnings;
 				if ($reshook < 0) {
 					$this->error = $hookmanager->error;
 					$this->errors = $hookmanager->errors;
@@ -1773,11 +1775,11 @@ class pdf_cyan extends ModelePDFPropales
 
 		if (getDolGlobalString('PDF_SHOW_PROJECT_TITLE')) {
 			$object->fetchProject();
-			if (!empty($object->project->ref)) {
+			if (!empty($object->project->title)) {
 				$posy += 3;
 				$pdf->SetXY($posx, $posy);
 				$pdf->SetTextColor(0, 0, 60);
-				$pdf->MultiCell($w, 3, $outputlangs->transnoentities("Project")." : ".(empty($object->project->title) ? '' : $object->project->title), '', 'R');
+				$pdf->MultiCell($w, 3, $outputlangs->transnoentities("Project")." : ". $object->project->title, '', 'R');
 			}
 		}
 
@@ -1788,7 +1790,7 @@ class pdf_cyan extends ModelePDFPropales
 				$posy += 3;
 				$pdf->SetXY($posx, $posy);
 				$pdf->SetTextColor(0, 0, 60);
-				$pdf->MultiCell($w, 3, $outputlangs->transnoentities("RefProject")." : ".(empty($object->project->ref) ? '' : $object->project->ref), '', 'R');
+				$pdf->MultiCell($w, 3, $outputlangs->transnoentities("RefProject")." : ". $object->project->ref, '', 'R');
 			}
 		}
 
@@ -1818,14 +1820,14 @@ class pdf_cyan extends ModelePDFPropales
 			$posy += 4;
 			$pdf->SetXY($posx, $posy);
 			$pdf->SetTextColor(0, 0, 60);
-			$pdf->MultiCell($w, 3, $outputlangs->transnoentities("CustomerCode")." : ".$outputlangs->transnoentities($object->thirdparty->code_client), '', 'R');
+			$pdf->MultiCell($w, 3, $outputlangs->transnoentities("CustomerCode")." : ".$outputlangs->transnoentities((string) $object->thirdparty->code_client), '', 'R');
 		}
 
 		if (!getDolGlobalString('MAIN_PDF_HIDE_CUSTOMER_ACCOUNTING_CODE') && $object->thirdparty->code_compta_client) {
 			$posy += 4;
 			$pdf->SetXY($posx, $posy);
 			$pdf->SetTextColor(0, 0, 60);
-			$pdf->MultiCell($w, 3, $outputlangs->transnoentities("CustomerAccountancyCode")." : ".$outputlangs->transnoentities($object->thirdparty->code_compta_client), '', 'R');
+			$pdf->MultiCell($w, 3, $outputlangs->transnoentities("CustomerAccountancyCode")." : ".$outputlangs->transnoentities((string) $object->thirdparty->code_compta_client), '', 'R');
 		}
 
 		// Get contact
@@ -1859,7 +1861,7 @@ class pdf_cyan extends ModelePDFPropales
 			if (count($arrayidcontact) > 0) {
 				$object->fetch_user($arrayidcontact[0]);
 				$labelbeforecontactname = ($outputlangs->transnoentities("FromContactName") != 'FromContactName' ? $outputlangs->transnoentities("FromContactName") : $outputlangs->transnoentities("Name"));
-				$carac_emetteur .= ($carac_emetteur ? "\n" : '').$labelbeforecontactname." ".$outputlangs->convToOutputCharset($object->user->getFullName($outputlangs));
+				$carac_emetteur .= $labelbeforecontactname." ".$outputlangs->convToOutputCharset($object->user->getFullName($outputlangs));
 				$carac_emetteur .= (getDolGlobalInt('PDF_SHOW_PHONE_AFTER_USER_CONTACT') || getDolGlobalInt('PDF_SHOW_EMAIL_AFTER_USER_CONTACT')) ? ' (' : '';
 				$carac_emetteur .= (getDolGlobalInt('PDF_SHOW_PHONE_AFTER_USER_CONTACT') && !empty($object->user->office_phone)) ? $object->user->office_phone : '';
 				$carac_emetteur .= (getDolGlobalInt('PDF_SHOW_PHONE_AFTER_USER_CONTACT') && getDolGlobalInt('PDF_SHOW_EMAIL_AFTER_USER_CONTACT')) ? ', ' : '';
@@ -1979,7 +1981,7 @@ class pdf_cyan extends ModelePDFPropales
 				if (!empty($carac_client_shipping)) {
 					$posy += $hautcadre;
 
-					$hautcadre -= 10;	// Height for the shipping address does not need to be as high as main box
+					$hautcadre -= 5; // Height for the shipping address does not need to be as high as main box
 
 					// Show shipping frame
 					$pdf->SetXY($posx + 2, $posy - 5);
@@ -2055,7 +2057,7 @@ class pdf_cyan extends ModelePDFPropales
 		if (getDolGlobalString('MAIN_PDF_PROPAL_USE_ELECTRONIC_SIGNING')) {
 			// Can be retrieve with getSignatureAppearanceArray()
 			// Can be also detected by putting the mouse over the area when using evince pdf reader
-			$pdf->addEmptySignatureAppearance($posx, $tab_top + $tab_hl, $largcol, $tab_hl * 3);
+			$pdf->addEmptySignatureAppearance($posx, $tab_top + $tab_hl + 3, $largcol, $tab_hl * 3);
 		}
 
 		return ($tab_hl * 7);
@@ -2065,11 +2067,11 @@ class pdf_cyan extends ModelePDFPropales
 	/**
 	 *   	Define Array Column Field
 	 *
-	 *   	@param	Propal			$object			object proposal
+	 *   	@param	CommonObject	$object			object proposal
 	 *   	@param	Translate		$outputlangs	langs
-	 *      @param	int				$hidedetails	Do not show line details
-	 *      @param	int				$hidedesc		Do not show desc
-	 *      @param	int				$hideref		Do not show ref
+	 *      @param	int<0,1>		$hidedetails	Do not show line details
+	 *      @param	int<0,1>		$hidedesc		Do not show desc
+	 *      @param	int<0,1>		$hideref		Do not show ref
 	 *      @return	void
 	 */
 	public function defineColumnField($object, $outputlangs, $hidedetails = 0, $hidedesc = 0, $hideref = 0)
@@ -2112,7 +2114,7 @@ class pdf_cyan extends ModelePDFPropales
 			'width' => 10,
 			'status' => getDolGlobalInt('PDF_CYAN_ADD_POSITION') ? true : (getDolGlobalInt('PDF_ADD_POSITION') ? true : false),
 			'title' => array(
-				'textkey' => '#', // use lang key is useful in somme case with module
+				'textkey' => '#', // use lang key is useful in some case with module
 				'align' => 'C',
 				// 'textkey' => 'yourLangKey', // if there is no label, yourLangKey will be translated to replace label
 				// 'label' => ' ', // the final label
@@ -2130,7 +2132,7 @@ class pdf_cyan extends ModelePDFPropales
 			'width' => false, // only for desc
 			'status' => true,
 			'title' => array(
-				'textkey' => 'Designation', // use lang key is useful in somme case with module
+				'textkey' => 'Designation', // use lang key is useful in some case with module
 				'align' => 'L',
 				// 'textkey' => 'yourLangKey', // if there is no label, yourLangKey will be translated to replace label
 				// 'label' => ' ', // the final label

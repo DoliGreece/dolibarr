@@ -1,10 +1,11 @@
 <?php
-/* Copyright (C) 2010-2012	Laurent Destailleur	<ely@users.sourceforge.net>
- * Copyright (C) 2012		Regis Houssin		<regis.houssin@inodbox.com>
- * Copyright (C) 2014		Marcos García		<marcosgdf@gmail.com>
- * Copyright (C) 2016		Charlie Benke		<charlie@patas-monkey.com>
- * Copyright (C) 2018-2025  Frédéric France		<frederic.france@free.fr>
+/* Copyright (C) 2010-2012	Laurent Destailleur			<ely@users.sourceforge.net>
+ * Copyright (C) 2012		Regis Houssin				<regis.houssin@inodbox.com>
+ * Copyright (C) 2014		Marcos García				<marcosgdf@gmail.com>
+ * Copyright (C) 2016		Charlie Benke				<charlie@patas-monkey.com>
+ * Copyright (C) 2018-2026  Frédéric France				<frederic.france@free.fr>
  * Copyright (C) 2024		MDW							<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2025		Alexandre Spangaro			<alexandre@inovea-conseil.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -344,6 +345,11 @@ class doc_generic_invoice_odt extends ModelePDFFactures
 				$nbProduct = 0;
 				$nbService = 0;
 				foreach ($object->lines as $line) {
+					// If DEPOSIT, this line is completely ignored for calculations.
+					if ($line->isDepositLine()) {
+						continue;
+					}
+
 					// determine category of operation
 					if ($categoryOfOperation < 2) {
 						$lineProductType = $line->product_type;

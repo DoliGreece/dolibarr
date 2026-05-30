@@ -28,12 +28,6 @@
 
 // Load Dolibarr environment
 require '../main.inc.php';
-
-require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
-require_once DOL_DOCUMENT_ROOT.'/core/class/doleditor.class.php';
-require_once DOL_DOCUMENT_ROOT.'/core/lib/receiptprinter.lib.php';
-require_once DOL_DOCUMENT_ROOT.'/core/class/dolreceiptprinter.class.php';
-
 /**
  * @var Conf $conf
  * @var DoliDB $db
@@ -41,6 +35,10 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/dolreceiptprinter.class.php';
  * @var Translate $langs
  * @var User $user
  */
+require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/core/class/doleditor.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/receiptprinter.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/takepos/class/dolreceiptprinter.class.php';
 
 // Load translation files required by the page
 $langs->loadLangs(array("admin", "receiptprinter"));
@@ -54,6 +52,7 @@ $mode = GETPOST('mode', 'alpha');
 
 $printername = GETPOST('printername', 'alpha');
 $printerid = GETPOSTINT('printerid');
+$printertypeid = GETPOSTINT('printertypeid');
 $parameter = GETPOST('parameter', 'alpha');
 
 $template = GETPOST('template', 'alphanohtml');
@@ -93,13 +92,13 @@ if ($action == 'addprinter') {
 		setEventMessages($langs->trans("PrinterNameEmpty"), null, 'errors');
 	}
 
-	if (empty($parameter)) {
+	if (empty($parameter) && $printertypeid > 1) {
 		setEventMessages($langs->trans("PrinterParameterEmpty"), null, 'warnings');
 	}
 
 	if (!$error) {
 		$db->begin();
-		$result = $printer->addPrinter($printername, GETPOSTINT('printertypeid'), GETPOSTINT('printerprofileid'), $parameter);
+		$result = $printer->addPrinter($printername, $printertypeid, GETPOSTINT('printerprofileid'), $parameter);
 		if ($result > 0) {
 			$error++;
 		}
@@ -109,7 +108,7 @@ if ($action == 'addprinter') {
 			setEventMessages($langs->trans("PrinterAdded", $printername), null);
 		} else {
 			$db->rollback();
-			dol_print_error($db);
+			setEventMessages($printer->error, $printer->errors, 'errors');
 		}
 	}
 	$action = '';
@@ -488,7 +487,7 @@ if ($mode == 'template') {
 				print '<input type="hidden" name="templateid" value="'.($printer->listprinterstemplates[$line]['rowid'] ?? '').'">';
 				print '<td><input type="text" class="minwidth200" name="templatename" value="'.($printer->listprinterstemplates[$line]['name'] ?? '').'"></td>';
 				print '<td class="wordbreak">';
-				print '<textarea name="template" wrap="soft" cols="120" rows="12">'.($printer->listprinterstemplates[$line]['template'] ?? '').'</textarea>';
+				print '<textarea name="template" wrap="soft" cols="90" rows="12">'.($printer->listprinterstemplates[$line]['template'] ?? '').'</textarea>';
 				print '</td>';
 				print '<td>';
 				print $form->buttonsSaveCancel("Save", '');
@@ -517,7 +516,7 @@ if ($mode == 'template') {
 		print '<tr>';
 		print '<td><input type="text" class="minwidth200" name="templatename" value="'.($printer->listprinterstemplates[$line]['name'] ?? '').'"></td>';
 		print '<td class="wordbreak">';
-		print '<textarea name="template" wrap="soft" cols="120" rows="12">';
+		print '<textarea name="template" wrap="soft" cols="90" rows="12">';
 		print '</textarea>';
 		print '</td>';
 		print '<td>';

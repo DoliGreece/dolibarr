@@ -44,7 +44,7 @@ $langs->loadLangs(array("admin", "eventorganization", "categories"));
 
 // Parameters
 $action = GETPOST('action', 'aZ09');
-$cancel = GETPOST('cancel', 'aZ09');
+$cancel = GETPOST('cancel', 'alpha');
 $backtopage = GETPOST('backtopage', 'alpha');
 
 $value = GETPOST('value', 'alpha');
@@ -59,11 +59,11 @@ if (empty($action)) {
 }
 
 $arrayofparameters = array(
-	'EVENTORGANIZATION_TASK_LABEL' => array('type' => 'textarea','enabled' => 1, 'css' => ''),
 	'EVENTORGANIZATION_CATEG_THIRDPARTY_CONF' => array('type' => 'category:'.Categorie::TYPE_CUSTOMER, 'enabled' => 1, 'css' => ''),
 	'EVENTORGANIZATION_CATEG_THIRDPARTY_BOOTH' => array('type' => 'category:'.Categorie::TYPE_CUSTOMER, 'enabled' => 1, 'css' => ''),
 	'EVENTORGANIZATION_FILTERATTENDEES_CAT' => array('type' => 'category:'.Categorie::TYPE_CUSTOMER, 'enabled' => 1, 'css' => ''),
 	'EVENTORGANIZATION_FILTERATTENDEES_TYPE' => array('type' => 'thirdparty_type:', 'enabled' => 1, 'css' => ''),
+	'EVENTORGANIZATION_TASK_LABEL' => array('type' => 'textarea','enabled' => 1, 'css' => 'height100'),
 	'EVENTORGANIZATION_TEMPLATE_EMAIL_ASK_CONF' => array('type' => 'emailtemplate:conferenceorbooth', 'enabled' => 1, 'css' => ''),
 	'EVENTORGANIZATION_TEMPLATE_EMAIL_ASK_BOOTH' => array('type' => 'emailtemplate:conferenceorbooth', 'enabled' => 1, 'css' => ''),
 	'EVENTORGANIZATION_TEMPLATE_EMAIL_AFT_SUBS_BOOTH' => array('type' => 'emailtemplate:conferenceorbooth', 'enabled' => 1, 'css' => ''),
@@ -274,7 +274,7 @@ if ($action == 'edit') {
 				if ($result < 0) {
 					setEventMessages(null, $c->errors, 'errors');
 				}
-				$ways = $c->print_all_ways(' &gt;&gt; ', 'none', 0, 1); // $ways[0] = "ccc2 >> ccc2a >> ccc2a1" with html formatted text
+				$ways = $c->print_all_ways('auto', 'none', 0, 1); // $ways[0] = "ccc2 >> ccc2a >> ccc2a1" with html formatted text
 				$toprint = array();
 				foreach ($ways as $way) {
 					$toprint[] = '<li class="select2-search-choice-dolibarr noborderoncategories"' . ($c->color ? ' style="background: #' . $c->color . ';"' : ' style="background: #bbb"') . '>' . $way . '</li>';

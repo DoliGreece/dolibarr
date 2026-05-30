@@ -136,15 +136,17 @@ foreach ($object->fields as $key => $val) {
 $object->fields = dol_sort_array($object->fields, 'position');
 $arrayfields = dol_sort_array($arrayfields, 'position');
 
-// Security
-if (!$user->hasRight('cron', 'read')) {
-	accessforbidden();
-}
 
 $permissiontoread = $user->hasRight('cron', 'read');
 $permissiontoadd = $user->hasRight('cron', 'create') ? $user->hasRight('cron', 'create') : $user->hasRight('cron', 'write');
 $permissiontodelete = $user->hasRight('cron', 'delete');
 $permissiontoexecute = $user->hasRight('cron', 'execute');
+
+// Security
+if (!$permissiontoread) {
+	accessforbidden();
+}
+// after this test $permissiontoread is always true and never can't be false
 
 $error = 0;
 //var_dump($arrayfields);
@@ -251,7 +253,7 @@ if (empty($reshook)) {
 			// Add $param from extra fields
 			include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_list_search_param.tpl.php';
 
-			header("Location: ".DOL_URL_ROOT.'/cron/list.php?'.$param.($sortfield ? '&sortfield='.$sortfield : '').($sortorder ? '&sortorder='.$sortorder : '')); // Make a redirect to avoid to run twice the job when using back
+			header("Location: ".DOL_URL_ROOT.'/cron/list.php?'.$param.'&sortfield='.$sortfield.'&sortorder='.$sortorder); // Make a redirect to avoid to run twice the job when using back
 			exit;
 		}
 	}
@@ -542,7 +544,7 @@ print '<table class="tagtable nobottomiftotal noborder liste'.($moreforfilter ? 
 // --------------------------------------------------------------------
 print '<tr class="liste_titre_filter">';
 // Action column
-if (getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+if ($conf->main_checkbox_left_column) {
 	print '<td class="liste_titre center maxwidthsearch">';
 	$searchpicto = $form->showFilterButtons('left');
 	print $searchpicto;
@@ -552,7 +554,7 @@ print '<td class="liste_titre">&nbsp;</td>';
 print '<td class="liste_titre">';
 print '<input type="text" class="flat width75" name="search_label" value="'.$search_label.'">';
 print '</td>';
-//print '<td class="liste_titre">&nbsp;</td>';
+print '<td class="liste_titre">&nbsp;</td>';
 print '<td class="liste_titre"><input type="text" class="width50" name="search_module_name" value="'.$search_module_name.'"></td>';
 print '<td class="liste_titre">&nbsp;</td>';
 print '<td class="liste_titre">&nbsp;</td>';
@@ -569,7 +571,7 @@ print $form->selectarray('search_status', array('0' => $langs->trans("Disabled")
 print '</td>';
 print '<td class="liste_titre">&nbsp;</td>';
 // Action column
-if (!getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+if (!$conf->main_checkbox_left_column) {
 	print '<td class="liste_titre right">';
 	$searchpicto = $form->showFilterButtons();
 	print $searchpicto;
@@ -584,12 +586,12 @@ $totalarray['nbfield'] = 0;
 // --------------------------------------------------------------------
 print '<tr class="liste_titre">';
 // Action column
-if (getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+if ($conf->main_checkbox_left_column) {
 	print_liste_field_titre($selectedfields, $_SERVER["PHP_SELF"], "", "", $param, '', $sortfield, $sortorder, 'center maxwidthsearch ');
 }
 print_liste_field_titre("Ref", $_SERVER["PHP_SELF"], "t.rowid", "", $param, '', $sortfield, $sortorder);
 print_liste_field_titre("CronLabel", $_SERVER["PHP_SELF"], "t.label", "", $param, '', $sortfield, $sortorder);
-//print_liste_field_titre("Priority", $_SERVER["PHP_SELF"], "t.priority", "", $param, '', $sortfield, $sortorder);
+print_liste_field_titre("Priority", $_SERVER["PHP_SELF"], "t.priority", "", $param, '', $sortfield, $sortorder);
 print_liste_field_titre("CronModule", $_SERVER["PHP_SELF"], "t.module_name", "", $param, '', $sortfield, $sortorder);
 print_liste_field_titre("", '', '', "", $param, '', $sortfield, $sortorder, 'tdoverflowmax50 ');
 print_liste_field_titre("CronFrequency", '', "", "", $param, '', $sortfield, $sortorder);
@@ -604,7 +606,7 @@ print_liste_field_titre("CronDtNextLaunch", $_SERVER["PHP_SELF"], "t.datenextrun
 print_liste_field_titre("Status", $_SERVER["PHP_SELF"], "t.status,t.priority", "", $param, '', $sortfield, $sortorder, 'center ');
 print_liste_field_titre("", $_SERVER["PHP_SELF"], "", "", $param, '', $sortfield, $sortorder, 'center ');
 // Action column
-if (!getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+if (!$conf->main_checkbox_left_column) {
 	print_liste_field_titre($selectedfields, $_SERVER["PHP_SELF"], "", "", $param, '', $sortfield, $sortorder, 'center maxwidthsearch ');
 }
 print '</tr>'."\n";
@@ -653,7 +655,7 @@ if ($num > 0) {
 		print '<tr class="oddeven row-with-select">';
 
 		// Action column
-		if (getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+		if ($conf->main_checkbox_left_column) {
 			print '<td class="nowraponall center">';
 			if ($massactionbutton || $massaction) {   // If we are in select mode (massactionbutton defined) or if we have already selected and sent an action ($massaction) defined
 				$selected = 0;
@@ -693,9 +695,9 @@ if ($num > 0) {
 		}
 
 		// Priority
-		/*print '<td class="right">';
+		print '<td class="right">';
 		print dol_escape_htmltag($object->priority);
-		print '</td>';*/
+		print '</td>';
 
 		// Module
 		print '<td>';
@@ -787,9 +789,9 @@ if ($num > 0) {
 		}
 
 		// Date start last run
-		print '<td class="center lineheightsmall" title="'.dol_escape_htmltag($datefromto).'">';
+		print '<td class="center celldateheight" title="'.dol_escape_htmltag($datefromto).'">';
 		if (!empty($datelastrun)) {
-			print dol_print_date($datelastrun, 'dayhoursec', 'tzserver');
+			print dolOutputDates($datelastrun, null, 0, 1, '', 'tzserver');
 		}
 		print '</td>';
 		if (!$i) {
@@ -824,7 +826,7 @@ if ($num > 0) {
 		// Output of last run
 		print '<td class="small minwidth150">';
 		if (!empty($obj->lastoutput)) {
-			print '<div class="twolinesmax lineheightsmall classfortooltip" title="'.dol_escape_htmltag($obj->lastoutput, 1, 1).'">';
+			print '<div class="twolinesmax lineheightsmall classfortooltip" title="'.dolPrintHTMLForAttribute($obj->lastoutput).'">';
 			print dol_trunc(dolGetFirstLineOfText($obj->lastoutput, 2), 100);
 			print '</div>';
 		}
@@ -834,20 +836,24 @@ if ($num > 0) {
 		}
 
 		// Next run date
-		print '<td class="center lineheightsmall">';
+		print '<td class="center celldateheight">';
 		if (!empty($obj->datenextrun)) {
 			$datenextrun = $db->jdate($obj->datenextrun);
 			if (empty($obj->status)) {
 				print '<span class="opacitymedium strikefordisabled">';
 			}
-			print dol_print_date($datenextrun, 'dayhoursec');
+
+			$pictotoadd = '';
 			if ($obj->status == Cronjob::STATUS_ENABLED) {
 				if ($obj->maxrun && $obj->nbrun >= $obj->maxrun) {
-					print img_warning($langs->trans("MaxRunReached"));
+					$pictotoadd .= img_warning($langs->trans("MaxRunReached"));
 				} elseif ($datenextrun && $datenextrun < $now) {
-					print img_warning($langs->trans("Late"));
+					$pictotoadd .= img_warning($langs->trans("Late"));
 				}
 			}
+
+			print dolOutputDates($datenextrun, null, 0, 1, $pictotoadd);
+
 			if (empty($obj->status)) {
 				print '</span>';
 			}
@@ -867,13 +873,13 @@ if ($num > 0) {
 
 		// Action
 		print '<td class="nowraponall right">';
-		$backtopage = urlencode($_SERVER["PHP_SELF"].'?'.$param.($sortfield ? '&sortfield='.$sortfield : '').($sortorder ? '&sortorder='.$sortorder : ''));
+		$backtopage = urlencode($_SERVER["PHP_SELF"].'?'.$param.'&sortfield='.$sortfield.'&sortorder='.$sortorder);
 		if ($user->hasRight('cron', 'create')) {
-			print '<a class="editfielda" href="'.DOL_URL_ROOT."/cron/card.php?id=".$obj->rowid.'&action=edit&token='.newToken().($sortfield ? '&sortfield='.$sortfield : '').($sortorder ? '&sortorder='.$sortorder : '').$param;
+			print '<a class="editfielda" href="'.DOL_URL_ROOT."/cron/card.php?id=".$obj->rowid.'&action=edit&token='.newToken().'&sortfield='.$sortfield.'&sortorder='.$sortorder.$param;
 			print "&backtopage=".$backtopage."\" title=\"".dol_escape_htmltag($langs->trans('Edit'))."\">".img_picto($langs->trans('Edit'), 'edit')."</a> &nbsp;";
 		}
 		if ($user->hasRight('cron', 'delete')) {
-			print '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?id=".$obj->rowid.'&action=delete&token='.newToken().($page ? '&page='.$page : '').($sortfield ? '&sortfield='.$sortfield : '').($sortorder ? '&sortorder='.$sortorder : '').$param;
+			print '<a class="reposition" href="'.$_SERVER["PHP_SELF"]."?id=".$obj->rowid.'&action=delete&token='.newToken().($page ? '&page='.$page : '').'&sortfield='.$sortfield.'&sortorder='.$sortorder.$param;
 			print '" title="'.dol_escape_htmltag($langs->trans('CronDelete')).'">'.img_picto($langs->trans('CronDelete'), 'delete', '', 0, 0, 0, '', 'marginleftonly').'</a> &nbsp; ';
 		} else {
 			print '<a href="#" title="'.dol_escape_htmltag($langs->trans('NotEnoughPermissions')).'">'.img_picto($langs->trans('NotEnoughPermissions'), 'delete', '', 0, 0, 0, '', 'marginleftonly').'</a> &nbsp; ';
@@ -881,9 +887,9 @@ if ($num > 0) {
 		if ($user->hasRight('cron', 'execute')) {
 			if (!empty($obj->status)) {
 				print '<a class="reposition" href="'.$_SERVER["PHP_SELF"].'?id='.$obj->rowid.'&action=execute&token='.newToken();
-				print(!getDolGlobalString('CRON_KEY') ? '' : '&securitykey=' . getDolGlobalString('CRON_KEY'));
-				print($sortfield ? '&sortfield='.$sortfield : '');
-				print($sortorder ? '&sortorder='.$sortorder : '');
+				print (!getDolGlobalString('CRON_KEY') ? '' : '&securitykey=' . getDolGlobalString('CRON_KEY'));
+				print '&sortfield='.$sortfield;
+				print '&sortorder='.$sortorder;
 				print $param."\" title=\"".dol_escape_htmltag($langs->trans('CronExecute'))."\">".img_picto($langs->trans('CronExecute'), "play", '', 0, 0, 0, '', 'marginleftonly').'</a>';
 			} else {
 				print '<a href="#" class="cursordefault" title="'.dol_escape_htmltag($langs->trans('JobDisabled')).'">'.img_picto($langs->trans('JobDisabled'), "playdisabled", '', 0, 0, 0, '', 'marginleftonly').'</a>';
@@ -897,7 +903,7 @@ if ($num > 0) {
 		}
 
 		// Action column
-		if (!getDolGlobalString('MAIN_CHECKBOX_LEFT_COLUMN')) {
+		if (!$conf->main_checkbox_left_column) {
 			print '<td class="nowraponall center">';
 			if ($massactionbutton || $massaction) {   // If we are in select mode (massactionbutton defined) or if we have already selected and sent an action ($massaction) defined
 				$selected = 0;

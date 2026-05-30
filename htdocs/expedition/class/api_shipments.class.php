@@ -3,6 +3,7 @@
  * Copyright (C) 2016       Laurent Destailleur     <eldy@users.sourceforge.net>
  * Copyright (C) 2025		MDW						<mdeweerd@users.noreply.github.com>
  * Copyright (C) 2025		Charlene Benke  		<charlene@patas-monkey.com>
+ * Copyright (C) 2025       Frédéric France         <frederic.france@free.fr>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -49,7 +50,7 @@ class Shipments extends DolibarrApi
 	 */
 	public function __construct()
 	{
-		global $db, $conf;
+		global $db;
 		$this->db = $db;
 		$this->shipment = new Expedition($this->db);
 	}
@@ -95,7 +96,7 @@ class Shipments extends DolibarrApi
 	 * @param int			   $limit				Limit for list
 	 * @param int			   $page				Page number
 	 * @param string		   $thirdparty_ids		Thirdparty ids to filter shipments of (example '1' or '1,2,3') {@pattern /^[0-9,]*$/i}
-	 * @param string           $sqlfilters          Other criteria to filter answers separated by a comma. Syntax example "(t.ref:like:'SO-%') and (t.date_creation:<:'20160101')"
+	 * @param string           $sqlfilters          Other criteria to filter answers separated by a comma. Syntax example "(t.ref:like:'SO-%') and (t.date_creation:>:'20160101')"
 	 * @param string		   $properties			Restrict the data returned to these properties. Ignored if empty. Comma separated list of properties names
 	 * @param bool             $pagination_data     If this parameter is set to true the response will include pagination data. Default value is false. Page starts from 0*
 	 * @return  array                               Array of shipment objects
@@ -515,7 +516,7 @@ class Shipments extends DolibarrApi
 
 			if ($field == 'array_options' && is_array($value)) {
 				foreach ($value as $index => $val) {
-					$this->shipment->array_options[$index] = $this->_checkValForAPI($field, $val, $this->shipment);
+					$this->shipment->array_options[$index] = $this->_checkValExtrafieldsForAPI($index, $val, $this->shipment);
 				}
 				continue;
 			}
@@ -739,9 +740,12 @@ class Shipments extends DolibarrApi
 	// phpcs:disable PEAR.NamingConventions.ValidFunctionName.PublicUnderscore
 	/**
 	 * Clean sensible object datas
+	 * @phpstan-template T
 	 *
 	 * @param   Object  $object     Object to clean
 	 * @return  Object              Object with cleaned properties
+	 * @phpstan-param T $object
+	 * @phpstan-return T
 	 */
 	protected function _cleanObjectDatas($object)
 	{
